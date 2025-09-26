@@ -1,12 +1,16 @@
 import os
 import uuid
 import bcrypt
+from fastapi.responses import JSONResponse
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Response
 from starlette.status import HTTP_400_BAD_REQUEST
 from tortoise.exceptions import DoesNotExist
 from schemas.userModel import User
 from schemas.userSchemas import UserCreate, UserLogin, ResetPasswordSchema
+from services.authServices import create_token
+from services.cookieServices import set_token_cookie
+from services.cookieServices import clear_token_cookie
 from emailService.authEmail import (
     send_forget_password_email,
     send_verification_email,
@@ -20,16 +24,13 @@ JWT_SECRET = os.getenv("JWT_SECRET", "supersecret")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
-def create_token(user: User, expires_in: int = 60 * 60):
-    payload = {"id": str(user.id)}
-    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
-
-
 async def handle_signup(user_data: UserCreate):
+    print(" Handling user signup...")
     existing_user = await User.filter(email=user_data.email).first()
+    print(f"Existing user check: {existing_user}")
     if existing_user:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="User already exists, Please login")
-
+    print("Creating new user...")
     hashed_password = bcrypt.hashpw(user_data.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
     new_user = await User.create(
         email=user_data.email,
@@ -37,6 +38,7 @@ async def handle_signup(user_data: UserCreate):
         full_name=user_data.full_name,
         role="user",
     )
+    print(f"New user created: {new_user}")
 
     verify_token = create_token(new_user, expires_in=1800)  # 30 min
     verify_url = f"{FRONTEND_URL}/verify-email/{verify_token}"
@@ -46,7 +48,7 @@ async def handle_signup(user_data: UserCreate):
         "success": True,
         "verifyUrl": verify_url,
         "message": "User registered. Please check your email to verify your account.",
-        "user": {"id": str(new_user.id), "email": new_user.email},
+        "user": {"id": str(new_user.id), "email": new_user.email, "full_name": new_user.full_name},
     }
 
 
@@ -102,14 +104,23 @@ async def handle_login(response: Response, user_data: UserLogin):
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Invalid password")
 
     token = create_token(user)
-    response.set_cookie(key="token", value=token, httponly=True)
 
-    return {"success": True, "message": "Login successful", "token": token, "user": {"id": str(user.id), "email": user.email}}
+    set_token_cookie(response, token)
+
+    return JSONResponse(
+        content={
+            "success": True,
+            "message": "Login successful",
+            "token": token,
+            "user": {"id": str(user.id), "email": user.email},
+        },
+        headers=response.headers  
+    )
 
 
 
 async def handle_logout(response: Response):
-    response.delete_cookie("token")
+    clear_token_cookie(response)
     return {"success": True, "message": "Logged out successfully"}
 
 

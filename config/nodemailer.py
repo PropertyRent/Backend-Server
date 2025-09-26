@@ -13,7 +13,6 @@ SMTP_PORT = 587
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
-
 async def send_email(to_email: EmailStr, subject: str, html_content: str):
     """
     Async email sender using Gmail SMTP (similar to nodemailer.createTransport).

@@ -9,7 +9,7 @@ from controller.userController import (
     handle_resend_verification,
 )
 
-router = APIRouter(prefix="/auth", tags=["Auth"])
+router = APIRouter(tags=["Auth"])
 
 router.post("/signup")(handle_signup)
 router.post("/login")(handle_login)

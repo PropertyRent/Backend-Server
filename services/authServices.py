@@ -26,23 +26,9 @@ def create_token(user: dict, expires_in: int = 30):
         }
         return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
     except Exception as e:
-        print("❌ Error creating token:", str(e))
+        print(" Error creating token:", str(e))
         return None
 
-
-def create_middleware_token(user: dict, expires_in: int = 30):
-    """
-    Create a lighter JWT token just with user id.
-    """
-    try:
-        payload = {
-            "id": str(user.id),
-            "exp": datetime.utcnow() + timedelta(days=expires_in),
-        }
-        return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    except Exception as e:
-        print("❌ Error creating middleware token:", str(e))
-        return None
 
 
 def validate_token(token: str):
@@ -54,8 +40,8 @@ def validate_token(token: str):
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return payload
     except jwt.ExpiredSignatureError:
-        print("❌ Token expired")
+        print(" Token expired")
         return None
     except jwt.InvalidTokenError as e:
-        print("❌ Invalid token:", str(e))
+        print(" Invalid token:", str(e))
         return None

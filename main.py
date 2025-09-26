@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.status import HTTP_401_UNAUTHORIZED
 
+
 from authMiddleware.authMiddleware import check_for_authentication_cookie
 from authMiddleware.roleMiddleware import authorize_roles
 from routes.authRoute import router as auth_router
@@ -55,10 +56,10 @@ app.include_router(
     dependencies=[Depends(authorize_roles(["user", "admin"]))],
 )
 
-# Initialize database
+init_db(app)
+
 @app.on_event("startup")
 async def startup_event():
-    init_db(app)
     print(f"Server running on port {PORT}")
 @app.get("/")
 async def root():
