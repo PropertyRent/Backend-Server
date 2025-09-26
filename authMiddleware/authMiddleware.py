@@ -1,12 +1,12 @@
 from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
-from ..authService.auth_service import validate_token
+from services.authServices import validate_token
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-async def get_current_user(
+async def check_for_authentication_cookie(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
 ):

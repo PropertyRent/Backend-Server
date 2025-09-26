@@ -1,30 +1,26 @@
 import uuid
-from sqlalchemy import Column, String, Enum
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.sql import func
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.types import DateTime
+from enum import Enum
+from tortoise import fields, models
 
-Base = declarative_base()
+class UserRole(str, Enum):
+    USER = "user"
+    ADMIN = "admin"
+    ADMIN_PLUS = "admin+"
+    SUPERADMIN = "superadmin"
 
-class User(Base):
-    __tablename__ = "users"
+class User(models.Model):
+    id = fields.UUIDField(pk=True, default=uuid.uuid4)
+    full_name = fields.CharField(max_length=255, null=True)
+    email = fields.CharField(max_length=255, unique=True, index=True)
+    password = fields.CharField(max_length=255, null=True)
+    profile_photo = fields.CharField(max_length=255, null=True)
+    phone = fields.CharField(max_length=20, null=True)
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
-    full_name = Column(String, nullable=True)
-    email = Column(String, nullable=False, unique=True, index=True)
-    password = Column(String, nullable=True)
-    profile_photo = Column(String, nullable=True)
-    phone = Column(String, nullable=True)
+    role = fields.CharEnumField(UserRole, default=UserRole.USER)
+    is_verified = fields.BooleanField(default=False)
 
-    role = Column(
-        Enum("user", "admin", "admin+", "superadmin", name="user_roles"),
-        default="user",
-        nullable=False,
-    )
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    def __repr__(self):
-        return f"<User {self.email}>"
+    def __str__(self):
+        return self.email

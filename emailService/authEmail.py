@@ -1,5 +1,5 @@
 import os
-from config.email_config import send_email
+from config.nodemailer import send_email
 
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")

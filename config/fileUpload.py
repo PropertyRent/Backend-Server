@@ -5,9 +5,7 @@ from typing import List
 from database import get_db
 from models.file_model import FileModel  # your DB model
 
-# -----------------------------
-# Helper function to save file in PostgreSQL
-# -----------------------------
+
 async def save_file_to_db(file: UploadFile, db: Session):
     try:
         contents = await file.read()  # read file as bytes
@@ -26,16 +24,12 @@ async def save_file_to_db(file: UploadFile, db: Session):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
-# -----------------------------
-# Dependency for single file
-# -----------------------------
+
 async def single_file_upload(field_name: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
     file_id = await save_file_to_db(file, db)
     return {"file_id": file_id, "file_name": file.filename, "content_type": file.content_type}
 
-# -----------------------------
-# Dependency for multiple files
-# -----------------------------
+
 async def multiple_file_upload(field_name: str, files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
     file_ids = []
     for file in files:

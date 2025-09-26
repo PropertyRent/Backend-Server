@@ -1,14 +1,22 @@
 from fastapi import APIRouter
-from controller.userController import userAuthController as auth
+from controller.userController import (
+    handle_signup,
+    handle_login,
+    handle_logout,
+    handle_forgot_password,
+    handle_reset_password,
+    handle_verify_email,
+    handle_resend_verification,
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
-router.post("/signup")(auth.handle_signup)
-router.post("/login")(auth.handle_login)
-router.post("/logout")(auth.handle_logout)
+router.post("/signup")(handle_signup)
+router.post("/login")(handle_login)
+router.post("/logout")(handle_logout)
 
-router.post("/forgot-password")(auth.handle_forgot_password)
-router.post("/reset-password/{reset_token}")(auth.handle_reset_password)
+router.post("/forgot-password")(handle_forgot_password)
+router.post("/reset-password/{reset_token}")(handle_reset_password)
 
-router.get("/verify-email/{token}")(auth.handle_verify_email)
-router.post("/resend-verification")(auth.handle_resend_verification)
+router.get("/verify-email/{token}")(handle_verify_email)
+router.post("/resend-verification")(handle_resend_verification)

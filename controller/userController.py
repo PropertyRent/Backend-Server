@@ -2,12 +2,10 @@ import os
 import uuid
 import bcrypt
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Response, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED
-from dbConnection.dbConfig import get_db
-from model.userModel.userModel import User
+from fastapi import APIRouter, Depends, HTTPException, Response
+from starlette.status import HTTP_400_BAD_REQUEST
+from tortoise.exceptions import DoesNotExist
+from schemas.userModel import User
 from schemas.userSchemas import UserCreate, UserLogin, ResetPasswordSchema
 from emailService.authEmail import (
     send_forget_password_email,
@@ -27,29 +25,21 @@ def create_token(user: User, expires_in: int = 60 * 60):
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
 
-@router.post("/signup")
-async def handle_signup(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == user_data.email))
-    existing_user = result.scalars().first()
-
+async def handle_signup(user_data: UserCreate):
+    existing_user = await User.filter(email=user_data.email).first()
     if existing_user:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="User already exists")
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="User already exists, Please login")
 
     hashed_password = bcrypt.hashpw(user_data.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-    new_user = User(
+    new_user = await User.create(
         email=user_data.email,
         password=hashed_password,
         full_name=user_data.full_name,
         role="user",
     )
 
-    db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
-
-    verify_token = create_token(new_user, expires_in=1800)  # 30m
+    verify_token = create_token(new_user, expires_in=1800)  # 30 min
     verify_url = f"{FRONTEND_URL}/verify-email/{verify_token}"
-
     await send_verification_email(new_user.email, verify_url)
 
     return {
@@ -60,61 +50,46 @@ async def handle_signup(user_data: UserCreate, db: AsyncSession = Depends(get_db
     }
 
 
-@router.get("/verify-email/{token}")
-async def handle_verify_email(token: str, db: AsyncSession = Depends(get_db)):
+async def handle_verify_email(token: str):
     try:
         decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
         user_id = decoded.get("id")
+        user = await User.get(id=uuid.UUID(user_id))
 
-        result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
-        user = result.scalars().first()
-
-        if not user:
-            raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Invalid token")
-
-        if getattr(user, "is_verified", False):
+        if user.is_verified:
             raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="User already verified")
 
         user.is_verified = True
-        await db.commit()
-
+        await user.save()
         await send_congrats_email(user.email)
         return {"success": True, "message": "Email verified successfully"}
 
-    except Exception:
+    except (jwt.ExpiredSignatureError, jwt.DecodeError, DoesNotExist):
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
 
 
-@router.post("/resend-verification")
-async def handle_resend_verification(data: dict, db: AsyncSession = Depends(get_db)):
-    email = data.get("email")
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalars().first()
 
+async def handle_resend_verification(data: dict):
+    email = data.get("email")
+    user = await User.filter(email=email).first()
     if not user:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="User not found")
-    if getattr(user, "is_verified", False):
+    if user.is_verified:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="User already verified")
 
     verify_token = create_token(user, expires_in=1800)
     verify_url = f"{FRONTEND_URL}/verify-email/{verify_token}"
-
     await send_verification_email(user.email, verify_url)
-
     return {"success": True, "verifyUrl": verify_url, "message": "Verification email resent"}
 
 
-@router.post("/login")
-async def handle_login(
-    response: Response, user_data: UserLogin, db: AsyncSession = Depends(get_db)
-):
-    result = await db.execute(select(User).where(User.email == user_data.email))
-    user = result.scalars().first()
 
+async def handle_login(response: Response, user_data: UserLogin):
+    user = await User.filter(email=user_data.email).first()
     if not user:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Invalid credentials")
 
-    if not getattr(user, "is_verified", False):
+    if not user.is_verified:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Please verify your email first")
 
     if not user.password:
@@ -132,48 +107,56 @@ async def handle_login(
     return {"success": True, "message": "Login successful", "token": token, "user": {"id": str(user.id), "email": user.email}}
 
 
-@router.post("/logout")
+
 async def handle_logout(response: Response):
     response.delete_cookie("token")
     return {"success": True, "message": "Logged out successfully"}
 
 
-@router.post("/forgot-password")
-async def handle_forgot_password(data: dict, db: AsyncSession = Depends(get_db)):
-    email = data.get("email")
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalars().first()
 
+async def handle_forgot_password(data: dict):
+    email = data.get("email")
+    user = await User.filter(email=email).first()
     if not user:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="User not found")
 
-    reset_token = create_token(user, expires_in=900)  # 15m
+    reset_token = create_token(user, expires_in=900)  # 15 min
     reset_url = f"{FRONTEND_URL}/reset-password/{reset_token}"
-
     await send_forget_password_email(user.email, reset_url)
-
     return {"success": True, "message": "Password reset email sent", "resetUrl": reset_url}
 
 
-@router.post("/reset-password/{reset_token}")
-async def handle_reset_password(reset_token: str, data: ResetPasswordSchema, db: AsyncSession = Depends(get_db)):
+async def handle_reset_password(reset_token: str, data: ResetPasswordSchema):
     try:
         decoded = jwt.decode(reset_token, JWT_SECRET, algorithms=["HS256"])
         user_id = decoded.get("id")
-
-        result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
-        user = result.scalars().first()
-
-        if not user:
-            raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="User not found")
+        user = await User.get(id=uuid.UUID(user_id))
 
         hashed_password = bcrypt.hashpw(data.new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         user.password = hashed_password
-        await db.commit()
-
+        await user.save()
         await send_password_reset_success_email(user.email)
-
         return {"success": True, "message": "Password reset successfully"}
 
-    except Exception:
+    except (jwt.ExpiredSignatureError, jwt.DecodeError, DoesNotExist):
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+
+async def get_current_user(user_id: str):
+    try:
+        user = await User.get(id=user_id)
+        return user
+    except DoesNotExist:
+        raise HTTPException(status_code=404, detail="User not found")
+
+
+async def handle_get_profile(current_user: User = Depends(get_current_user)):
+    try:
+        user_dict = current_user.__dict__.copy()
+        user_dict.pop("password", None) 
+        return {"success": True, "user": user_dict}
+    except Exception as error:
+        return {
+            "success": False,
+            "message": "Server error",
+            "error": str(error)
+        }

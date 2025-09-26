@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from typing import List, Dict
-from .auth_dependency import get_current_user
+from .authMiddleware import check_for_authentication_cookie
 
 
 def authorize_roles(roles: List[str]):
@@ -9,7 +9,7 @@ def authorize_roles(roles: List[str]):
     Equivalent to Express authorizeRoles.js
     """
 
-    async def role_checker(current_user: Dict = Depends(get_current_user)):
+    async def role_checker(current_user: Dict = Depends(check_for_authentication_cookie)):
         if current_user.get("role") not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
+from tortoise.contrib.fastapi import register_tortoise
 
 load_dotenv()
 
@@ -11,22 +10,17 @@ DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 
-DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,
-    pool_pre_ping=True,
-    connect_args={"ssl": "require"},  
-)
-
-
-async_session_maker = sessionmaker(
-    engine, expire_on_commit=False, class_=AsyncSession
-)
-
-Base = declarative_base()
-
-async def get_db():
-    async with async_session_maker() as session:
-        yield session
+def init_db(app):
+    """
+    Initialize Tortoise ORM for FastAPI app.
+    """
+    register_tortoise(
+        app,
+        db_url=DATABASE_URL,
+        modules={"models": ["schemas.userModel"]},  
+        generate_schemas=True, 
+        add_exception_handlers=True,
+    )
+    print("Database connected and Tortoise initialized")
