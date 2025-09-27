@@ -9,3 +9,9 @@ wheels/
 # Virtual environments
 .venv
 .env
+PROPERTY_API.md
+.env.*
+venv/
+ENV/
+env/
+.venv/
