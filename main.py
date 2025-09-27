@@ -11,6 +11,7 @@ from authMiddleware.authMiddleware import check_for_authentication_cookie
 from authMiddleware.roleMiddleware import authorize_roles
 from routes.authRoute import router as auth_router
 from routes.profileRoute import router as user_profile_router
+from routes.propertyRoute import router as property_router
 
 from dbConnection.dbConfig import init_db  
 
@@ -53,6 +54,12 @@ app.include_router(
     user_profile_router,
     prefix="/api/user",
     tags=["User"],
+    dependencies=[Depends(authorize_roles(["user", "admin"]))],
+)
+app.include_router(
+    property_router,
+    prefix="/api",
+    tags=["Properties"],
     dependencies=[Depends(authorize_roles(["user", "admin"]))],
 )
 

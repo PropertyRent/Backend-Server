@@ -17,4 +17,7 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.43",
     "tortoise-orm>=0.25.1",
     "uvicorn>=0.37.0",
+    "pillow>=10.4.0",
+    "python-magic>=0.4.27",
+    "python-multipart>=0.0.9",
 ]

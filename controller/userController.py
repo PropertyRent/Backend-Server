@@ -3,19 +3,21 @@ import uuid
 import bcrypt
 from fastapi.responses import JSONResponse
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File, Form
 from starlette.status import HTTP_400_BAD_REQUEST
 from tortoise.exceptions import DoesNotExist
-from schemas.userModel import User
-from schemas.userSchemas import UserCreate, UserLogin, ResetPasswordSchema
+from model.userModel import User
+from schemas.userSchemas import UserCreate, UserLogin, ResetPasswordSchema, UserUpdate
 from services.authServices import create_token
 from services.cookieServices import set_token_cookie
 from services.cookieServices import clear_token_cookie
+from config.fileUpload import process_profile_photo
 from emailService.authEmail import (
     send_forget_password_email,
     send_verification_email,
     send_password_reset_success_email,
     send_congrats_email,
+    send_update_profile_email,
 )
 
 router = APIRouter()
@@ -171,3 +173,123 @@ async def handle_get_profile(current_user: User = Depends(get_current_user)):
             "message": "Server error",
             "error": str(error)
         }
+
+
+async def handle_update_profile(
+    full_name: str = Form(None),
+    phone: str = Form(None),
+    profile_photo: UploadFile = File(None),
+    current_user: User = Depends(get_current_user)
+):
+    """Update user profile with optional photo upload"""
+    try:
+        print(f" Updating profile for user: {current_user.email}")
+        
+        update_data = {}
+        
+        # Update text fields if provided
+        if full_name is not None:
+            update_data['full_name'] = full_name
+            
+        if phone is not None:
+            update_data['phone'] = phone
+        
+        # Process profile photo if uploaded
+        if profile_photo:
+            print(f" Processing profile photo: {profile_photo.filename}")
+            try:
+                # Process image to base64
+                base64_image = await process_profile_photo(profile_photo)
+                update_data['profile_photo'] = base64_image
+                print(" Profile photo processed successfully")
+            except HTTPException as e:
+                raise e
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Photo processing failed: {str(e)}")
+        
+        # Update user if there's data to update
+        if update_data:
+            await current_user.update_from_dict(update_data)
+            await current_user.save()
+            
+            # Send confirmation email
+            await send_update_profile_email(current_user.email)
+            
+            print(f" Profile updated successfully for user: {current_user.email}")
+            
+            # Return updated user data (without password)
+            updated_user = await User.get(id=current_user.id)
+            user_dict = updated_user.__dict__.copy()
+            user_dict.pop("password", None)
+            
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "message": "Profile updated successfully",
+                    "user": {
+                        "id": str(user_dict["id"]),
+                        "email": user_dict["email"],
+                        "full_name": user_dict["full_name"],
+                        "phone": user_dict["phone"],
+                        "profile_photo": user_dict["profile_photo"],
+                        "role": user_dict["role"],
+                        "is_verified": user_dict["is_verified"],
+                        "created_at": user_dict["created_at"].isoformat(),
+                        "updated_at": user_dict["updated_at"].isoformat()
+                    }
+                }
+            )
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "message": "No data provided for update"
+                }
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as error:
+        print(f" Profile update failed: {error}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update profile"
+        )
+
+
+async def handle_upload_profile_photo(
+    profile_photo: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload/update profile photo only"""
+    try:
+        print(f" Uploading profile photo for user: {current_user.email}")
+        
+        # Process image to base64
+        base64_image = await process_profile_photo(profile_photo)
+        
+        # Update user profile photo
+        current_user.profile_photo = base64_image
+        await current_user.save()
+        
+        print(" Profile photo uploaded successfully")
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "message": "Profile photo updated successfully",
+                "profile_photo": base64_image
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as error:
+        print(f" Profile photo upload failed: {error}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to upload profile photo"
+        )
