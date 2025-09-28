@@ -14,6 +14,7 @@ from routes.profileRoute import router as user_profile_router
 from routes.propertyRoute import router as property_router
 from routes.teamRoute import router as team_router
 from routes.contactRoute import router as contact_router
+from routes.screeningQuestionRoute import router as screening_router
 
 from dbConnection.dbConfig import init_db  
 
@@ -79,6 +80,9 @@ app.include_router(
     tags=["Contact Management"],
     dependencies=[Depends(authorize_roles(["admin"]))],  # Admin contact management
 )
+
+# Screening routes - public access and admin management
+app.include_router(screening_router, prefix="/api", tags=["Screening Questions"])  # Both public and admin routes
 
 init_db(app)
 
