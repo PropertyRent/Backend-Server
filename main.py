@@ -12,6 +12,8 @@ from authMiddleware.roleMiddleware import authorize_roles
 from routes.authRoute import router as auth_router
 from routes.profileRoute import router as user_profile_router
 from routes.propertyRoute import router as property_router
+from routes.teamRoute import router as team_router
+from routes.contactRoute import router as contact_router
 
 from dbConnection.dbConfig import init_db  
 
@@ -61,6 +63,21 @@ app.include_router(
     prefix="/api",
     tags=["Properties"],
     dependencies=[Depends(authorize_roles(["user", "admin"]))],
+)
+app.include_router(
+    team_router,
+    prefix="/api",
+    tags=["Team"],
+    dependencies=[Depends(authorize_roles(["admin"]))],  # Only admins can manage team
+)
+
+# Contact routes - public contact form, admin management
+app.include_router(contact_router, prefix="/api/public", tags=["Contact"])  # Public contact form
+app.include_router(
+    contact_router,
+    prefix="/api/admin",
+    tags=["Contact Management"],
+    dependencies=[Depends(authorize_roles(["admin"]))],  # Admin contact management
 )
 
 init_db(app)
