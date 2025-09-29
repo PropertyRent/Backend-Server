@@ -63,7 +63,7 @@ The application follows a layered architecture pattern with clear separation of 
 
 The system uses a relational PostgreSQL database with the following key relationships:
 
-- **Users**: Role-based authentication (admin/user) with email verification
+- **Users**: Role-based authentication (admin) with email verification
 - **Properties**: Comprehensive property information with status management
 - **PropertyMedia**: One-to-many relationship with properties for multiple file storage
 - **Contacts**: Contact form submissions with admin management capabilities

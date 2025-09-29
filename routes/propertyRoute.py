@@ -205,11 +205,15 @@ async def update_property_with_media(
 async def delete_property(property_id: str):
     return await handle_delete_property(property_id)
 
-@router.get("/admin/properties",
-    summary="[ADMIN] Get all properties with advanced filtering",
-    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
+# === PROPERTY VIEWING ROUTES (Both Admin & Users) ===
+# Unified routes for viewing properties - accessible to both admin and users
+
+@router.get("/properties",
+    summary="Get all properties with filtering (Admin & Users)",
+    dependencies=[Depends(check_for_authentication_cookie)]
 )
-async def admin_get_all_properties(
+async def get_all_properties(
+    request: Request,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None),
@@ -223,130 +227,70 @@ async def admin_get_all_properties(
     bathrooms: Optional[int] = Query(None),
     furnishing: Optional[str] = Query(None)
 ):
-    return await handle_get_properties_admin(
-        page=page,
-        limit=limit,
-        search=search,
-        property_type=property_type,
-        status=status,
-        city=city,
-        state=state,
-        min_price=min_price,
-        max_price=max_price,
-        bedrooms=bedrooms,
-        bathrooms=bathrooms,
-        furnishing=furnishing
-    )
-
-@router.get("/admin/properties/{property_id}",
-    summary="[ADMIN] Get property by ID with full details",
-    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
-)
-async def admin_get_property_by_id(property_id: str):
-    return await handle_get_property_by_id(property_id, is_admin=True)
-
-# === USER PROPERTY ROUTES (Public/Read-only) ===
-# Users can only view available properties
-
-@router.get("/properties",
-    summary="[PUBLIC] Get available properties for users"
-)
-async def get_available_properties(
-    page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=50),  # Lower limit for public users
-    search: Optional[str] = Query(None),
-    property_type: Optional[str] = Query(None),
-    city: Optional[str] = Query(None),
-    state: Optional[str] = Query(None),
-    min_price: Optional[float] = Query(None),
-    max_price: Optional[float] = Query(None),
-    bedrooms: Optional[int] = Query(None),
-    bathrooms: Optional[int] = Query(None),
-    furnishing: Optional[str] = Query(None)
-):
-    return await handle_get_properties_public(
-        page=page,
-        limit=limit,
-        search=search,
-        property_type=property_type,
-        city=city,
-        state=state,
-        min_price=min_price,
-        max_price=max_price,
-        bedrooms=bedrooms,
-        bathrooms=bathrooms,
-        furnishing=furnishing
-    )
+    # Check if user is admin to determine which handler to use
+    try:
+        user_payload = await check_for_authentication_cookie(request)
+        user_role = user_payload.get("role", "user")
+        is_admin = user_role == "admin"
+        
+        if is_admin:
+            return await handle_get_properties_admin(
+                page=page,
+                limit=limit,
+                search=search,
+                property_type=property_type,
+                status=status,
+                city=city,
+                state=state,
+                min_price=min_price,
+                max_price=max_price,
+                bedrooms=bedrooms,
+                bathrooms=bathrooms,
+                furnishing=furnishing
+            )
+        else:
+            return await handle_get_properties_public(
+                page=page,
+                limit=limit,
+                search=search,
+                property_type=property_type,
+                city=city,
+                state=state,
+                min_price=min_price,
+                max_price=max_price,
+                bedrooms=bedrooms,
+                bathrooms=bathrooms,
+                furnishing=furnishing
+            )
+    except Exception:
+        # If authentication fails, show public properties
+        return await handle_get_properties_public(
+            page=page,
+            limit=limit,
+            search=search,
+            property_type=property_type,
+            city=city,
+            state=state,
+            min_price=min_price,
+            max_price=max_price,
+            bedrooms=bedrooms,
+            bathrooms=bathrooms,
+            furnishing=furnishing
+        )
 
 @router.get("/properties/{property_id}",
-    summary="[PUBLIC] Get single property details for users"
+    summary="Get property details by ID (Admin & Users)",
+    dependencies=[Depends(check_for_authentication_cookie)]
 )
-async def get_property_details(property_id: str):
-    return await handle_get_property_by_id(property_id, is_admin=False)
-
-
-@router.post("/test-media-upload",
-    summary="[TEST] Test media file upload functionality"
-)
-async def test_media_upload(
-    files: List[UploadFile] = File(...)
-):
-    """Test endpoint to verify media file upload is working"""
+async def get_property_by_id(request: Request, property_id: str):
+    # Check if user is admin to determine view level
     try:
-        from config.fileUpload import handle_general_media_upload
+        user_payload = await check_for_authentication_cookie(request)
+        user_role = user_payload.get("role", "user")
+        is_admin = user_role == "admin"
         
-        print(f"🧪 TEST ROUTE: Received {len(files)} files")
-        for i, file in enumerate(files):
-            print(f"🧪 TEST ROUTE: File {i}: {file.filename} - Content-Type: {file.content_type}")
-        
-        # Process files using our general upload function
-        result = await handle_general_media_upload(
-            files=files,
-            upload_type="property",
-            max_files=10,
-            compress_images=True,
-            quality=85
-        )
-        
-        return {
-            "success": True,
-            "message": f"Successfully processed {result['file_count']} files",
-            "data": {
-                "processed_files": len(result['processed_files']),
-                "file_count": result['file_count'],
-                "errors": result['errors'],
-                "file_info": result['file_info']
-            }
-        }
-        
-    except Exception as e:
-        print(f"🧪 TEST ROUTE ERROR: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "message": "Test upload failed"
-        }
+        return await handle_get_property_by_id(property_id, is_admin=is_admin)
+    except Exception:
+        # If authentication fails, show public view
+        return await handle_get_property_by_id(property_id, is_admin=False)
 
-
-@router.post("/simple-file-test")
-async def simple_file_test(
-    files: List[UploadFile] = File(default=[])
-):
-    """Simplest possible file upload test - no auth, no processing"""
-    print(f"🔥 SIMPLE TEST: Received {len(files)} files")
-    
-    file_details = []
-    for i, file in enumerate(files):
-        print(f"🔥 SIMPLE TEST: File {i}: {file.filename}")
-        file_details.append({
-            "index": i,
-            "filename": file.filename,
-            "content_type": file.content_type,
-            "size": getattr(file, 'size', 'unknown')
-        })
-    
-    return {
-        "success": True,
-        "files_received": len(files),
-        "file_details": file_details
-    }
