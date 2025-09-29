@@ -4,7 +4,8 @@ from controller.propertyController import (
     handle_create_property,
     handle_update_property,
     handle_delete_property,
-    handle_get_all_properties,
+    handle_get_properties_admin,
+    handle_get_properties_public,
     handle_get_property_by_id
 )
 from authMiddleware.authMiddleware import check_for_authentication_cookie
@@ -155,6 +156,16 @@ async def update_property_with_media(
     remove_media_ids: Optional[str] = Form(None),  # "id1,id2,id3" - comma separated IDs to remove
     set_cover_media_id: Optional[str] = Form(None)  # Set specific media as cover image
 ):
+    # Debug media files in update route
+    print(f"🔄 UPDATE ROUTE DEBUG: media_files received = {media_files}")
+    print(f"🔄 UPDATE ROUTE DEBUG: media_files type = {type(media_files)}")
+    print(f"🔄 UPDATE ROUTE DEBUG: len(media_files) = {len(media_files)}")
+    if media_files and len(media_files) > 0:
+        for i, mf in enumerate(media_files):
+            print(f"🔄 UPDATE ROUTE DEBUG: File {i}: {mf.filename if hasattr(mf, 'filename') else 'NO_FILENAME'} - Size: {getattr(mf, 'size', 'unknown')}")
+    else:
+        print("🔄 UPDATE ROUTE DEBUG: No files received or empty list")
+    
     return await handle_update_property(
         property_id=property_id,
         title=title,
@@ -205,27 +216,26 @@ async def admin_get_all_properties(
     property_type: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     city: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
     min_price: Optional[float] = Query(None),
     max_price: Optional[float] = Query(None),
     bedrooms: Optional[int] = Query(None),
-    furnishing: Optional[str] = Query(None),
-    sort_by: Optional[str] = Query("created_at"),
-    sort_order: Optional[str] = Query("desc")
+    bathrooms: Optional[int] = Query(None),
+    furnishing: Optional[str] = Query(None)
 ):
-    return await handle_get_all_properties(
+    return await handle_get_properties_admin(
         page=page,
         limit=limit,
         search=search,
         property_type=property_type,
         status=status,
         city=city,
+        state=state,
         min_price=min_price,
         max_price=max_price,
         bedrooms=bedrooms,
-        furnishing=furnishing,
-        sort_by=sort_by,
-        sort_order=sort_order,
-        admin_view=True
+        bathrooms=bathrooms,
+        furnishing=furnishing
     )
 
 @router.get("/admin/properties/{property_id}",
@@ -233,7 +243,7 @@ async def admin_get_all_properties(
     dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
 async def admin_get_property_by_id(property_id: str):
-    return await handle_get_property_by_id(property_id, admin_view=True)
+    return await handle_get_property_by_id(property_id, is_admin=True)
 
 # === USER PROPERTY ROUTES (Public/Read-only) ===
 # Users can only view available properties
@@ -247,34 +257,32 @@ async def get_available_properties(
     search: Optional[str] = Query(None),
     property_type: Optional[str] = Query(None),
     city: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
     min_price: Optional[float] = Query(None),
     max_price: Optional[float] = Query(None),
     bedrooms: Optional[int] = Query(None),
-    furnishing: Optional[str] = Query(None),
-    sort_by: Optional[str] = Query("created_at"),
-    sort_order: Optional[str] = Query("desc")
+    bathrooms: Optional[int] = Query(None),
+    furnishing: Optional[str] = Query(None)
 ):
-    return await handle_get_all_properties(
+    return await handle_get_properties_public(
         page=page,
         limit=limit,
         search=search,
         property_type=property_type,
-        status="available",  # Force to only show available properties
         city=city,
+        state=state,
         min_price=min_price,
         max_price=max_price,
         bedrooms=bedrooms,
-        furnishing=furnishing,
-        sort_by=sort_by,
-        sort_order=sort_order,
-        admin_view=False
+        bathrooms=bathrooms,
+        furnishing=furnishing
     )
 
 @router.get("/properties/{property_id}",
     summary="[PUBLIC] Get single property details for users"
 )
 async def get_property_details(property_id: str):
-    return await handle_get_property_by_id(property_id, admin_view=False)
+    return await handle_get_property_by_id(property_id, is_admin=False)
 
 
 @router.post("/test-media-upload",

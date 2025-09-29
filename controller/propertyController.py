@@ -788,47 +788,63 @@ async def handle_update_property(
                 else:
                     print("⚠️ Cover media not found or doesn't belong to this property")
             
-            # Handle new media files
+            # Handle new media files using general upload function (same as create)
             media_added_count = 0
             new_media_results = []
             if media_files and len(media_files) > 0:
-                print(f"📸 Adding {len(media_files)} new media files...")
+                print(f"📸 Adding {len(media_files)} new media files using general upload function...")
                 
-                for i, media_file in enumerate(media_files):
-                    if media_file.filename:
-                        try:
-                            print(f"📸 Processing new file {i+1}: {media_file.filename}")
-                            
-                            # Determine media type
-                            media_type = "image"
-                            if media_file.content_type and media_file.content_type.startswith("video/"):
-                                media_type = "video"
-                            
-                            # Process the media file
-                            base64_url = await process_property_media(media_file, media_type)
-                            
-                            # Create media record
-                            media_record = await PropertyMedia.create(
-                                property=property_obj,
-                                media_type=media_type,
-                                url=base64_url,
-                                is_cover=False  # Don't auto-set as cover for updates
-                            )
-                            
-                            new_media_results.append({
-                                "id": str(media_record.id),
-                                "media_type": media_record.media_type,
-                                "url": media_record.url,
-                                "is_cover": media_record.is_cover,
-                                "created_at": media_record.created_at.isoformat(),
-                                "updated_at": media_record.updated_at.isoformat()
-                            })
-                            
-                            media_added_count += 1
-                            print(f"✅ New media file {i+1} added successfully")
-                            
-                        except Exception as media_error:
-                            print(f"❌ Failed to add media file {i+1}: {media_error}")
+                try:
+                    # Use the same general media upload function as create
+                    upload_result = await handle_general_media_upload(
+                        files=media_files,
+                        upload_type="property",
+                        max_files=20,
+                        compress_images=True,
+                        quality=85,
+                        max_width=1920,
+                        max_height=1080
+                    )
+                    
+                    if upload_result['success'] and upload_result['processed_files']:
+                        print(f"📸 Successfully processed {upload_result['file_count']} files for update")
+                        
+                        # Create database records for each processed file
+                        for i, (base64_url, file_info) in enumerate(zip(upload_result['processed_files'], upload_result['file_info'])):
+                            try:
+                                media_record = await PropertyMedia.create(
+                                    property=property_obj,
+                                    media_type=file_info.get('media_type', 'image'),
+                                    url=base64_url,
+                                    is_cover=False  # Don't auto-set as cover for updates
+                                )
+                                
+                                new_media_results.append({
+                                    "id": str(media_record.id),
+                                    "media_type": media_record.media_type,
+                                    "url": media_record.url,
+                                    "is_cover": media_record.is_cover,
+                                    "created_at": media_record.created_at.isoformat(),
+                                    "updated_at": media_record.updated_at.isoformat(),
+                                    "original_filename": file_info.get('original_filename'),
+                                    "file_size_mb": file_info.get('size_mb')
+                                })
+                                
+                                media_added_count += 1
+                                print(f"✅ Database record created for update file {i+1}")
+                                
+                            except Exception as db_error:
+                                print(f"❌ Failed to create database record for update file {i+1}: {db_error}")
+                    
+                    # Log any errors from processing
+                    if upload_result['errors']:
+                        print(f"⚠️ Some update files had errors: {upload_result['errors']}")
+                    
+                    print(f"✅ Final update result: {media_added_count} media files successfully added to property")
+                    
+                except Exception as upload_error:
+                    print(f"❌ Media upload processing failed during update: {upload_error}")
+                    # Continue with property update even if media fails
         
         # Get updated property with current media
         updated_property = await Property.get(id=property_id).prefetch_related('media')

@@ -14,7 +14,7 @@ class PropertyMedia(models.Model):
         "models.Property", related_name="media", on_delete=fields.CASCADE
     )
     media_type = fields.CharEnumField(MediaType)
-    url = fields.TextField()  # Changed to TextField for base64 storage
+    url = fields.TextField()  # Long text field for base64 storage (no length limit)
     is_cover = fields.BooleanField(default=False)
 
     created_at = fields.DatetimeField(auto_now_add=True)

@@ -1,371 +1,336 @@
-<div align="center">
+# Property Web Backend
 
-#  Property Rental Backend
+A comprehensive FastAPI-based backend application for property management and rental services, featuring integrated media handling, role-based authentication, and complete CRUD operations.
 
-FastAPI + Tortoise ORM backend for a property rental platform featuring authentication, property & media management, team management, contact system, and customizable screening (application) forms.
+## Project Overview
 
-![Stack](https://img.shields.io/badge/FastAPI-0.117+-009688?logo=fastapi&logoColor=white) ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white) ![DB](https://img.shields.io/badge/PostgreSQL-Supabase-336791?logo=postgresql&logoColor=white) ![Auth](https://img.shields.io/badge/Auth-JWT-green) ![Images](https://img.shields.io/badge/Images-Base64-orange)
+This backend service provides a robust foundation for property rental and management platforms, offering admin property management capabilities, public property browsing, user authentication, team management, and automated communication systems.
 
-</div>
+## Tech Stack
 
----
+- **Framework**: FastAPI 0.117.1+
+- **ORM**: Tortoise ORM 0.25.1+ with async PostgreSQL support
+- **Database**: PostgreSQL with asyncpg driver
+- **Authentication**: JWT tokens with HTTP-only cookies and bcrypt password hashing
+- **Email Service**: aiosmtplib for SMTP email delivery
+- **File Processing**: Python multipart with Pillow for image compression and base64 storage
+- **Validation**: Pydantic 2.11.9+ with email validation support
+- **Development**: UV for dependency management and Python 3.11+
 
-##  Features
+## Architecture Overview
 
--  JWT auth with role-based access (user/admin) & cookie sessions
--  User profiles with base64 image storage
--  Property CRUD with media gallery & cover image selection
--  Base64 image ingestion (Pillow compression + validation)
--  Team member management (public showcase)
--  Contact system with admin replies + email notifications
--  Customizable screening/application question forms (text/number/date)
--  Fully documented APIs (see `PROPERTY_API.md`, `CONTACT_API.md`, `SCREENING_API.md`)
--  Email service with templated messages (auth + contact)
+The application follows a layered architecture pattern with clear separation of concerns:
 
----
+### Core Components
 
-##  Project Structure
+**Application Layer** (`main.py`)
+- FastAPI application initialization and configuration
+- CORS middleware for cross-origin requests
+- Session middleware for secure cookie handling
+- Route registration with role-based dependencies
+- Database connection initialization
 
-```
-Backend/
-├── main.py                     # FastAPI entrypoint
-├── pyproject.toml              # Dependencies (managed with uv)
-├── uv.lock                     # Lock file
-├── .env                        # Environment variables (NOT committed)
-│
-├── authMiddleware/             # Auth & role middlewares
-│   ├── authMiddleware.py
-│   └── roleMiddleware.py
-│
-├── config/                     # Config utilities
-│   ├── fileUpload.py           # Image processing & base64 conversion
-│   └── nodemailer.py           # Email SMTP setup
-│
-├── controller/                 # Business logic controllers
-│   ├── userController.py
-│   ├── propertyController.py
-│   ├── propertyMediaController.py
-│   ├── teamController.py
-│   ├── contactController.py
-│   └── screeningQuestionController.py
-│
-├── dbConnection/               # DB init / ORM config
-│   └── dbConfig.py
-│
-├── emailService/               # Email templates/services
-│   ├── authEmail.py
-│   └── contactEmail.py
-│
-├── model/                      # Tortoise ORM models
-│   ├── userModel.py
-│   ├── propertyModel.py
-│   ├── propertyMediaModel.py
-│   ├── teamModel.py
-│   ├── contactModel.py
-│   └── screeningQuestionModel.py
-│
-├── routes/                     # API routers
-│   ├── authRoute.py
-│   ├── profileRoute.py
-│   ├── propertyRoute.py
-│   ├── teamRoute.py
-│   ├── contactRoute.py
-│   └── screeningQuestionRoute.py
-│
-├── schemas/                    # Pydantic schemas
-│   ├── userSchemas.py
-│   ├── propertySchemas.py
-│   ├── propertyMediaSchemas.py
-│   ├── teamSchemas.py
-│   ├── contactSchemas.py
-│   └── screeningQuestionSchemas.py
-│
-├── services/                   # Service helpers
-│   ├── authServices.py
-│   └── cookieServices.py
-│
-├── CONTACT_API.md              # Contact endpoints docs
-├── PROPERTY_API.md             # Property & media docs
-├── SCREENING_API.md            # Screening form system docs
-├── SYSTEM_OVERVIEW.md          # High-level architecture
-└── README.md                   # This file
-```
+**Authentication & Authorization** (`authMiddleware/`)
+- JWT token validation and cookie authentication
+- Role-based access control (admin/user permissions)
+- Request authentication middleware integration
 
----
+**Business Logic** (`controller/`)
+- Property management with integrated media processing
+- User account management and authentication flows
+- Contact form processing and team member management
+- Screening question administration
 
-##  Tech Stack
+**Data Models** (`model/`)
+- Tortoise ORM models with PostgreSQL backend
+- Property model with comprehensive attributes (20+ fields)
+- PropertyMedia model for base64 file storage
+- User model with role-based permissions
+- Relational models for contacts, teams, and screening questions
 
-| Layer            | Tools |
-|------------------|-------|
-| Web Framework    | FastAPI |
-| ORM              | Tortoise ORM (async) |
-| Database         | PostgreSQL (Supabase) |
-| Auth             | JWT + Cookie sessions |
-| Email            | SMTP (aiosmtplib) |
-| Media            | Pillow + base64 storage |
-| Validation       | Pydantic V2 |
-| Environment      | python-dotenv |
-| Runtime          | uvicorn / uv |
+**API Routes** (`routes/`)
+- RESTful endpoint definitions with FastAPI routers
+- Admin and public access separation
+- Form-data multipart support for file uploads
+- Query parameter validation and filtering
 
----
+**Data Validation** (`schemas/`)
+- Pydantic schemas for request/response validation
+- Type-safe data serialization and deserialization
+- Email format validation and custom validators
 
-##  Environment Variables (`.env`)
+### Database Design
 
-Create a `.env` file at project root:
+The system uses a relational PostgreSQL database with the following key relationships:
+
+- **Users**: Role-based authentication (admin/user) with email verification
+- **Properties**: Comprehensive property information with status management
+- **PropertyMedia**: One-to-many relationship with properties for multiple file storage
+- **Contacts**: Contact form submissions with admin management capabilities
+- **Teams**: Team member information restricted to admin access
+- **ScreeningQuestions**: Property application screening system
+
+## Project Structure
 
 ```
-PORT=8001
-FRONTEND_URL=http://localhost:3000
-
-# Postgres / Supabase
-DB_USER=postgres
-DB_PASS=yourpassword
-DB_HOST=your-host.supabase.co
-DB_PORT=5432
-DB_NAME=postgres
-
-# JWT / Auth
-JWT_SECRET=your_jwt_secret_key
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
-
-# Email / SMTP
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=youremail@gmail.com
-EMAIL_PASS=your_app_password
-EMAIL_FROM=Property Rentals <youremail@gmail.com>
+backend/
+├── main.py                     # FastAPI application entry point and configuration
+├── pyproject.toml             # UV project dependencies and Python requirements
+├── uv.lock                    # Locked dependency versions for reproducible builds
+├── .env                       # Environment variables (not in repository)
+├── .python-version            # Python version specification
+│
+├── authMiddleware/            # Authentication and authorization middleware
+│   ├── authMiddleware.py      # JWT token validation and cookie authentication
+│   └── roleMiddleware.py      # Role-based access control decorators
+│
+├── config/                    # Configuration and utility modules
+│   ├── fileUpload.py          # General media upload with base64 processing
+│   └── nodemailer.py          # SMTP email configuration and setup
+│
+├── controller/                # Business logic and request handlers
+│   ├── contactController.py          # Contact form processing
+│   ├── propertyController.py         # Property CRUD with integrated media
+│   ├── propertyMediaController.py    # Media management utilities
+│   ├── screeningQuestionController.py # Application screening logic
+│   ├── teamController.py             # Team member management
+│   └── userController.py             # User authentication and profile
+│
+├── dbConnection/              # Database configuration and connection
+│   └── dbConfig.py            # Tortoise ORM setup and PostgreSQL connection
+│
+├── emailService/              # Email delivery services
+│   ├── authEmail.py           # Authentication and verification emails
+│   └── contactEmail.py        # Contact form notification emails
+│
+├── model/                     # Tortoise ORM database models
+│   ├── contactModel.py        # Contact form data model
+│   ├── propertyMediaModel.py  # Property media storage model
+│   ├── propertyModel.py       # Main property information model
+│   ├── screeningQuestionModel.py # Application screening model
+│   ├── teamModel.py           # Team member information model
+│   └── userModel.py           # User account and authentication model
+│
+├── routes/                    # FastAPI router definitions
+│   ├── authRoute.py           # Authentication endpoints
+│   ├── contactRoute.py        # Contact form and management routes
+│   ├── profileRoute.py        # User profile management
+│   ├── propertyRoute.py       # Property CRUD with admin/public separation
+│   ├── screeningQuestionRoute.py # Screening question management
+│   └── teamRoute.py           # Team member administration
+│
+├── schemas/                   # Pydantic validation schemas
+│   ├── contactSchemas.py      # Contact form validation
+│   ├── propertyMediaSchemas.py # Media upload validation
+│   ├── propertySchemas.py     # Property data validation
+│   ├── screeningQuestionSchemas.py # Screening validation
+│   ├── teamSchemas.py         # Team member validation
+│   └── userSchemas.py         # User registration and profile validation
+│
+└── services/                  # Utility and helper services
+    ├── authServices.py        # JWT token generation and validation utilities
+    └── cookieServices.py      # HTTP-only cookie management
 ```
 
----
+## API Architecture
 
-##  Quick Start (Using `uv`)
+### Endpoint Organization
 
-### 1. Clone Repository
+**Authentication Routes** (`/api/auth`)
+- Public authentication endpoints for user registration and login
+- Email verification and password reset functionality
+- Session management with secure cookie handling
+
+**Admin Property Management** (`/api/admin/properties`)
+- Complete property CRUD operations restricted to admin users
+- Integrated media upload supporting multiple files per property
+- Property status management (available, rented, maintenance)
+- Comprehensive property details with location and amenity information
+
+**Public Property Access** (`/api/properties`)
+- Public property browsing with filtered information
+- Property search and filtering capabilities
+- Read-only access to approved property listings
+
+**User Profile Management** (`/api/user`)
+- Authenticated user profile access and updates
+- User preference management and account settings
+
+**Team Administration** (`/api/team`)
+- Admin-only team member management
+- Team information and role assignment
+
+**Contact Management**
+- Public contact form submission (`/api/public/contact`)
+- Admin contact review and management (`/api/admin/contact`)
+
+**Screening Questions** (`/api/screening`)
+- Property application screening system
+- Admin management of screening criteria
+
+### Authentication Flow
+
+1. **User Registration**: Email validation with verification token
+2. **Login Process**: JWT token generation with HTTP-only cookie storage
+3. **Request Authentication**: Middleware validates cookies on protected routes
+4. **Role Authorization**: Admin/user role separation for restricted endpoints
+5. **Password Recovery**: Secure token-based password reset system
+
+### Media Processing Pipeline
+
+1. **File Upload**: Multipart form-data reception with validation
+2. **Image Processing**: Pillow-based compression and optimization
+3. **Base64 Conversion**: Secure storage format for database persistence
+4. **Integration**: Seamless media attachment during property creation/updates
+
+## Installation and Setup
+
+### Prerequisites
+
+- Python 3.11 or higher
+- UV package manager
+- PostgreSQL database instance
+- SMTP email service (Gmail recommended)
+
+### Installation Steps
+
+1. **Clone Repository**
 ```bash
-git clone https://github.com/PropertyRent/Backend-Server.git
-cd Backend-Server/Backend
+git clone <repository-url>
+cd property-web-backend
 ```
 
-### 2. Install uv (if missing)
-```bash
-pip install uv
-```
-
-### 3. Install Dependencies
+2. **Install Dependencies**
 ```bash
 uv sync
 ```
 
-### 4. Setup Environment
+3. **Environment Configuration**
+Create `.env` file with required variables:
+```env
+# Database Configuration
+DB_NAME=your name
+DB_USER=your user name
+DB_PASS=your pass 
+DB_HOST=your host
+DB_PORT=6543
+
+# JWT Authentication
+JWT_SECRET=your_secure_jwt_secret_key
+
+
+# SMTP Email Service
+ADMIN_EMAIL=your admin email
+ADMIN_PASSWORD=you admin pass
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=same as admin for now
+EMAIL_PASS=same as admin for now
+EMAIL_FROM=same as admin for now
+
+# Application Configuration
+FRONTEND_URL=http://localhost:3000
+PORT=8001
+```
+
+4. **Database Setup**
+Ensure PostgreSQL is running.
+
+
+5. **Start Development Server**
 ```bash
-copy .env.example .env   # (or create manually)
+uv run uvicorn main:app --reload --host 127.0.0.1 --port 8001
 ```
 
-### 5. Run Server
-```bash
-uv run python main.py
-# or hot reload (if you add --reload support)
-uv run uvicorn main:app --reload --port 8001
+## API Documentation
+
+### Interactive Documentation
+- **Swagger UI**: http://127.0.0.1:8001/docs
+- **ReDoc**: http://127.0.0.1:8001/redoc
+
+### Core Endpoints
+
+#### Authentication System
+```
+POST /api/auth/signup                 - User registration with email verification
+POST /api/auth/login                  - User authentication with cookie session
+POST /api/auth/logout                 - Session termination
+POST /api/auth/forgot-password        - Password reset request
+POST /api/auth/reset-password/{token} - Password reset confirmation
+GET  /api/auth/verify-email/{token}   - Email address verification
+POST /api/auth/resend-verification    - Resend verification email
 ```
 
-### 6. API Docs
-- Swagger: http://localhost:8001/docs  
-- ReDoc: http://localhost:8001/redoc
-
----
-
-##  Automatic DB Initialization
-On startup Tortoise ORM connects and (with `generate_schemas=True` in `dbConfig.py` via `register_tortoise`) creates tables for all listed models in `TORTOISE_ORM['apps']['models']['models']`.
-
-Ensure `statement_cache_size=0` (already set) for Supabase PgBouncer compatibility.
-
----
-
-##  Authentication Flow
-1. User registers → record created → optional verification email
-2. User logs in → JWT created → stored in `token` HTTP-only cookie
-3. Protected routes read cookie → middleware validates token → role enforced
-4. Admin-only endpoints use `authorize_roles(["admin"])`
-
-Sequence (simplified):
+#### Property Management
 ```
-Client → POST /api/auth/login → JWT → Set-Cookie(token)
-Client → GET /api/user/profile → Cookie sent → Middleware validates → 200 OK
+# Admin Routes (Authentication + Admin Role Required)
+POST /api/admin/properties/add            - Create property with optional media
+PUT  /api/admin/properties/{property_id}  - Update property with optional media  
+DELETE /api/admin/properties/{property_id} - Delete property and associated media
+GET  /api/admin/properties                - Get all properties (admin detailed view)
+GET  /api/admin/properties/{property_id}  - Get property by ID (admin view)
+
+# Public Routes (Authentication Required)
+GET /api/properties                    - Get public property listings (filtered)
+GET /api/properties/{property_id}      - Get public property details
 ```
 
----
-
-##  Property & Media Flow
-
+#### User Management
 ```
-User (auth) → POST /api/properties → Property created
-		  → POST /api/properties/{id}/media (base64 image)
-		  → GET /api/properties?filters=... (public or protected depending design)
-Admin → DELETE /api/admin/properties/{id}
+GET  /api/user/profile    - Get user profile (Authentication Required)
+PUT  /api/user/profile    - Update user profile (Authentication Required)
 ```
 
-Media Handling:
-- Image uploaded → validated (MIME) → compressed (Pillow) → stored as base64 TEXT
-- Cover image flagged via specific field (`is_cover_image`)
-
----
-
-##  Team Management Flow
+#### Team Administration
 ```
-Admin → POST /api/team/members → add team member (base64 photo)
-Public → GET /api/team/members → list team
-Admin → PUT/DELETE /api/team/members/{id}
+GET    /api/team          - Get team members (Admin Only)
+POST   /api/team          - Add team member (Admin Only)
+PUT    /api/team/{id}     - Update team member (Admin Only)
+DELETE /api/team/{id}     - Remove team member (Admin Only)
 ```
 
----
-
-##  Contact System Flow
+#### Contact Management
 ```
-Visitor → POST /api/public/contact
-	→ DB store (status=pending)
-	→ Email: user confirmation + admin notification
-Admin → GET /api/admin/contact → list
-Admin → POST /api/admin/contact/{id}/reply → sets status=replied & emails user
-Admin → PUT /api/admin/contact/{id}/status → mark resolved
+POST /api/public/contact  - Submit contact form (Public)
+GET  /api/admin/contacts  - Get contact submissions (Admin Only)
+PUT  /api/admin/contacts/{id} - Update contact status (Admin Only)
 ```
 
----
-
-##  Screening (Custom Form) Flow
+#### Screening Questions
 ```
-Admin → POST /api/admin/screening/questions (create many questions: text/number/date)
-Public → GET /api/public/screening/questions (only active, ordered)
-User  → POST /api/public/screening/responses (answers validated per type)
-Admin → GET /api/admin/screening/responses → list w/ counts
-Admin → GET /api/admin/screening/responses/{id} → full detail
+GET    /api/screening     - Get screening questions
+POST   /api/screening     - Create screening question (Admin Only)
+PUT    /api/screening/{id} - Update screening question (Admin Only)
+DELETE /api/screening/{id} - Delete screening question (Admin Only)
 ```
 
-Answer Storage:
-- One `ScreeningResponse` per submission
-- Each question answered via `ScreeningAnswer` with typed column (text/number/date)
 
----
 
-##  High-Level Architecture
+### Development Configuration
 
-```
-[ FastAPI Routers ] → [ Controllers ] → [ Models (Tortoise ORM) ] → PostgreSQL
-			 ↓                ↓                 
-		 Schemas         Services (auth, email, file)
-			 ↓                ↓
-		Request ↔ Response  External (SMTP)
-```
+For development environments, ensure the following:
+- PostgreSQL database is accessible and properly configured
+- SMTP credentials are valid (Gmail App Password recommended)
+- Frontend URL matches your development frontend server
+- CORS origins are properly configured for cross-origin requests
 
-Data Flow Example (Property Image Upload):
-```
-Client → POST /api/properties/{id}/media (multipart/base64) →
- fileUpload.py (validate + compress + base64) →
- propertyMediaController.py → Tortoise Model → DB
-```
+## Development Guidelines
 
----
+### Code Organization
+- Follow Python PEP 8 style guidelines
+- Use type hints throughout the codebase
+- Implement consistent error handling patterns
+- Maintain clear separation between routes, controllers, and models
 
-##  Route Reference
+### Database Operations
+- Use Tortoise ORM async/await patterns
+- Implement proper transaction handling for complex operations
+- Follow database migration best practices
+- Maintain referential integrity with foreign key constraints
 
-### Auth (`/api/auth`)
-| Method | Route | Description |
-|--------|-------|-------------|
-| POST | /register | Register user |
-| POST | /login | Login & set cookie |
-| POST | /logout | (If implemented) Clear cookie |
 
-### User Profile (`/api/user`)
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | /profile | Get profile |
-| PUT | /profile | Update profile (with optional photo) |
 
-### Properties (`/api`)
-(Representative; see `PROPERTY_API.md` for detailed filters)
-| Method | Route | Description |
-|--------|-------|-------------|
-| POST | /properties | Create property |
-| GET | /properties | List/filter properties |
-| GET | /properties/{id} | Get property |
-| PUT | /properties/{id} | Update property |
-| DELETE | /properties/{id} | Delete (owner/admin) |
-| POST | /properties/{id}/media | Add media |
-| PUT | /properties/{id}/media/{media_id}/cover | Set cover image |
-| DELETE | /properties/{id}/media/{media_id} | Remove media |
 
-### Team (`/api`)
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | /team/members | Public list |
-| POST | /team/members | Create (admin) |
-| PUT | /team/members/{id} | Update (admin) |
-| DELETE | /team/members/{id} | Delete (admin) |
+## License
 
-### Contact (`/api`)
-| Method | Route | Description |
-|--------|-------|-------------|
-| POST | /public/contact | Submit inquiry |
-| GET | /admin/contact | List (admin) |
-| GET | /admin/contact/{id} | Detail (admin) |
-| POST | /admin/contact/{id}/reply | Reply & email user |
-| PUT | /admin/contact/{id}/status | Update status (admin) |
-| DELETE | /admin/contact/{id} | Delete (admin) |
-
-### Screening (`/api`)
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | /public/screening/questions | Active questions |
-| POST | /public/screening/responses | Submit answers |
-| POST | /admin/screening/questions | Create question |
-| GET | /admin/screening/questions | List (opt inactive) |
-| PUT | /admin/screening/questions/{id} | Update |
-| DELETE | /admin/screening/questions/{id} | Delete |
-| PUT | /admin/screening/questions/reorder | Bulk reorder |
-| GET | /admin/screening/responses | List submissions |
-| GET | /admin/screening/responses/{id} | Detailed view |
-| DELETE | /admin/screening/responses/{id} | Delete submission |
-
----
-
-##  Suggested Improvements / Next Steps
-
-- Add pagination & filtering docs to README for properties
-- Add refresh token strategy (long-lived sessions)
-- Add background tasks for email sending
-- Introduce Alembic migrations (instead of auto-generate)
-- Add structured logging (loguru / stdlib)
-- Implement rate limiting (slowapi)
-- Add unit/integration tests (pytest + httpx)
-- Dockerize (compose: app + db + mailhog)
-
----
-
-##  Security Notes
-- Use HTTPS in production
-- Rotate `JWT_SECRET` regularly
-- Store images outside DB for scale (future S3/GCS option)
-- Sanitize all user-generated HTML (if rendering anywhere)
-
----
-
-##  Contributing
-1. Fork repo
-2. Create feature branch
-3. Run lint/tests (if added)
-4. Submit PR with description
-
----
-
-##  License
-Add your preferred license (e.g., MIT) here.
-
----
-
-##  Support
-Open an issue or email the maintainer at `youremail@example.com`.
-
----
-
-Happy building! 
-
+This project is licensed under the MIT License. See LICENSE file for details.
