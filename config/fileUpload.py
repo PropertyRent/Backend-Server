@@ -14,8 +14,8 @@ SUPPORTED_VIDEO_FORMATS = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', '
 # Maximum file sizes (in bytes)
 
 
-MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
-MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50MB
+MAX_IMAGE_SIZE = 50 * 1024 * 1024  # 50MB
+MAX_VIDEO_SIZE = 200 * 1024 * 1024  # 200MB
 
 
 
