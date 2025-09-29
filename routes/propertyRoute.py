@@ -205,15 +205,13 @@ async def update_property_with_media(
 async def delete_property(property_id: str):
     return await handle_delete_property(property_id)
 
-# === PROPERTY VIEWING ROUTES (Both Admin & Users) ===
-# Unified routes for viewing properties - accessible to both admin and users
+# === PROPERTY VIEWING ROUTES (Public Access) ===
+# No authentication required - accessible to everyone
 
 @router.get("/properties",
-    summary="Get all properties with filtering (Admin & Users)",
-    dependencies=[Depends(check_for_authentication_cookie)]
+    summary="Get all properties with filtering (Public Access)"
 )
 async def get_all_properties(
-    request: Request,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None),
@@ -227,70 +225,25 @@ async def get_all_properties(
     bathrooms: Optional[int] = Query(None),
     furnishing: Optional[str] = Query(None)
 ):
-    # Check if user is admin to determine which handler to use
-    try:
-        user_payload = await check_for_authentication_cookie(request)
-        user_role = user_payload.get("role", "user")
-        is_admin = user_role == "admin"
-        
-        if is_admin:
-            return await handle_get_properties_admin(
-                page=page,
-                limit=limit,
-                search=search,
-                property_type=property_type,
-                status=status,
-                city=city,
-                state=state,
-                min_price=min_price,
-                max_price=max_price,
-                bedrooms=bedrooms,
-                bathrooms=bathrooms,
-                furnishing=furnishing
-            )
-        else:
-            return await handle_get_properties_public(
-                page=page,
-                limit=limit,
-                search=search,
-                property_type=property_type,
-                city=city,
-                state=state,
-                min_price=min_price,
-                max_price=max_price,
-                bedrooms=bedrooms,
-                bathrooms=bathrooms,
-                furnishing=furnishing
-            )
-    except Exception:
-        # If authentication fails, show public properties
-        return await handle_get_properties_public(
-            page=page,
-            limit=limit,
-            search=search,
-            property_type=property_type,
-            city=city,
-            state=state,
-            min_price=min_price,
-            max_price=max_price,
-            bedrooms=bedrooms,
-            bathrooms=bathrooms,
-            furnishing=furnishing
-        )
+    # Always return public properties (no authentication required)
+    return await handle_get_properties_public(
+        page=page,
+        limit=limit,
+        search=search,
+        property_type=property_type,
+        city=city,
+        state=state,
+        min_price=min_price,
+        max_price=max_price,
+        bedrooms=bedrooms,
+        bathrooms=bathrooms,
+        furnishing=furnishing
+    )
 
 @router.get("/properties/{property_id}",
-    summary="Get property details by ID (Admin & Users)",
-    dependencies=[Depends(check_for_authentication_cookie)]
+    summary="Get property details by ID (Public Access)"
 )
-async def get_property_by_id(request: Request, property_id: str):
-    # Check if user is admin to determine view level
-    try:
-        user_payload = await check_for_authentication_cookie(request)
-        user_role = user_payload.get("role", "user")
-        is_admin = user_role == "admin"
-        
-        return await handle_get_property_by_id(property_id, is_admin=is_admin)
-    except Exception:
-        # If authentication fails, show public view
-        return await handle_get_property_by_id(property_id, is_admin=False)
+async def get_property_by_id(property_id: str):
+    # Always return public view (no authentication required)
+    return await handle_get_property_by_id(property_id, is_admin=False)
 

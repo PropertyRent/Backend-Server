@@ -47,7 +47,6 @@ app.include_router(
     property_router,
     prefix="/api",
     tags=["Properties"],
-    dependencies=[Depends(authorize_roles(["user", "admin"]))],
 )
 app.include_router(
     team_router,
