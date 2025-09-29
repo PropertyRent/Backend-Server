@@ -6,7 +6,9 @@ from controller.propertyController import (
     handle_delete_property,
     handle_get_properties_admin,
     handle_get_properties_public,
-    handle_get_property_by_id
+    handle_get_property_by_id,
+    handle_get_property_cover_image,
+    handle_get_all_property_cover_images
 )
 from authMiddleware.authMiddleware import check_for_authentication_cookie
 from authMiddleware.roleMiddleware import require_admin
@@ -246,4 +248,27 @@ async def get_all_properties(
 async def get_property_by_id(property_id: str):
     # Always return public view (no authentication required)
     return await handle_get_property_by_id(property_id, is_admin=False)
+
+# === PROPERTY COVER IMAGE ROUTES (Public Access) ===
+# Get cover images for properties - no authentication required
+
+@router.get("/properties/{property_id}/cover-image",
+    summary="Get cover image for a specific property (Public Access)"
+)
+async def get_property_cover_image(property_id: str):
+    """
+    Get the cover image for a specific property.
+    Returns the media file where is_cover=True, or the first available image as fallback.
+    """
+    return await handle_get_property_cover_image(property_id)
+
+@router.get("/properties/cover-images/all",
+    summary="Get all property cover images (Public Access)"
+)
+async def get_all_property_cover_images():
+    """
+    Get cover images for all properties.
+    Returns all media files where is_cover=True across all properties.
+    """
+    return await handle_get_all_property_cover_images()
 

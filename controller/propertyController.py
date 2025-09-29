@@ -1423,3 +1423,144 @@ async def handle_get_all_properties(
 async def handle_get_property_by_id(property_id: str, is_admin: bool = True):
     """Alias for get property details - backward compatibility"""
     return await handle_get_property_details(property_id=property_id, is_admin=is_admin)
+
+
+async def handle_get_property_cover_image(property_id: str):
+    """Get the cover image for a specific property"""
+    try:
+        # Validate property_id format
+        try:
+            property_uuid = uuid.UUID(property_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST,
+                detail="Invalid property ID format"
+            )
+        
+        # Check if property exists
+        try:
+            property_obj = await Property.get(id=property_uuid)
+        except DoesNotExist:
+            raise HTTPException(
+                status_code=HTTP_404_NOT_FOUND,
+                detail="Property not found"
+            )
+        
+        # Find cover image for this property
+        try:
+            cover_media = await PropertyMedia.get(
+                property_id=property_uuid,
+                is_cover=True
+            )
+            
+            return JSONResponse(
+                status_code=HTTP_200_OK,
+                content={
+                    "success": True,
+                    "message": "Cover image found",
+                    "data": {
+                        "id": str(cover_media.id),
+                        "property_id": str(cover_media.property_id),
+                        "media_type": cover_media.media_type,
+                        "url": cover_media.url,
+                        "is_cover": cover_media.is_cover,
+                        "created_at": cover_media.created_at.isoformat(),
+                        "updated_at": cover_media.updated_at.isoformat()
+                    }
+                }
+            )
+            
+        except DoesNotExist:
+            # No cover image found, try to get the first image as fallback
+            try:
+                first_image = await PropertyMedia.filter(
+                    property_id=property_uuid,
+                    media_type="image"
+                ).first()
+                
+                if first_image:
+                    return JSONResponse(
+                        status_code=HTTP_200_OK,
+                        content={
+                            "success": True,
+                            "message": "No cover image set, returning first available image",
+                            "data": {
+                                "id": str(first_image.id),
+                                "property_id": str(first_image.property_id),
+                                "media_type": first_image.media_type,
+                                "url": first_image.url,
+                                "is_cover": first_image.is_cover,
+                                "created_at": first_image.created_at.isoformat(),
+                                "updated_at": first_image.updated_at.isoformat()
+                            }
+                        }
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=HTTP_404_NOT_FOUND,
+                        detail="No images found for this property"
+                    )
+                    
+            except Exception as fallback_error:
+                raise HTTPException(
+                    status_code=HTTP_404_NOT_FOUND,
+                    detail="No cover image or images found for this property"
+                )
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting property cover image: {str(e)}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get property cover image: {str(e)}"
+        )
+
+
+async def handle_get_all_property_cover_images():
+    """Get cover images for all properties"""
+    try:
+        # Get only 3 properties with their cover images
+        cover_images = await PropertyMedia.filter(is_cover=True).prefetch_related('property').limit(3)
+        
+        if not cover_images:
+            return JSONResponse(
+                status_code=HTTP_200_OK,
+                content={
+                    "success": True,
+                    "message": "No cover images found",
+                    "data": [],
+                    "total": 0
+                }
+            )
+        
+        # Format response
+        cover_images_data = []
+        for cover_image in cover_images:
+            cover_images_data.append({
+                "id": str(cover_image.id),
+                "property_id": str(cover_image.property_id),
+                "property_title": cover_image.property.title if cover_image.property else None,
+                "media_type": cover_image.media_type,
+                "url": cover_image.url,
+                "is_cover": cover_image.is_cover,
+                "created_at": cover_image.created_at.isoformat(),
+                "updated_at": cover_image.updated_at.isoformat()
+            })
+        
+        return JSONResponse(
+            status_code=HTTP_200_OK,
+            content={
+                "success": True,
+                "message": f"Found {len(cover_images_data)} cover images",
+                "data": cover_images_data,
+                "total": len(cover_images_data)
+            }
+        )
+        
+    except Exception as e:
+        print(f"❌ Error getting all property cover images: {str(e)}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get property cover images: {str(e)}"
+        )
