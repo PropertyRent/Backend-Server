@@ -2,7 +2,7 @@ import os
 from config.nodemailer import send_email
 
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "no-reply@example.com")
 
 

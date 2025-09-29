@@ -12,8 +12,11 @@ SUPPORTED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 
 SUPPORTED_VIDEO_FORMATS = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv']
 
 # Maximum file sizes (in bytes)
+
+
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
 MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50MB
+
 
 
 def validate_file_type(file_content: bytes, expected_types: List[str]) -> bool:

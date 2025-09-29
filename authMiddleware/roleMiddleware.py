@@ -8,7 +8,7 @@ def authorize_roles(roles: List[str]):
     Dependency factory to restrict routes to specific roles.
     Equivalent to Express authorizeRoles.js
     """
-
+    
     async def role_checker(current_user: Dict = Depends(check_for_authentication_cookie)):
         if current_user.get("role") not in roles:
             raise HTTPException(

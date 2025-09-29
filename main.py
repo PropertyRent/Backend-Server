@@ -11,6 +11,7 @@ from routes.propertyRoute import router as property_router
 from routes.teamRoute import router as team_router
 from routes.contactRoute import router as contact_router
 from routes.screeningQuestionRoute import router as screening_router
+from routes.scheduleMeetingRoute import router as meeting_router
 
 from dbConnection.dbConfig import init_db  
 
@@ -66,6 +67,9 @@ app.include_router(
 
 # Screening routes - public access and admin management
 app.include_router(screening_router, prefix="/api", tags=["Screening Questions"])  # Both public and admin routes
+
+# Meeting scheduling routes - public scheduling, authenticated user management, admin approval
+app.include_router(meeting_router, prefix="/api", tags=["Schedule Meetings"])  # Mixed access levels
 
 init_db(app)
 
