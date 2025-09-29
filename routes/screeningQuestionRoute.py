@@ -7,7 +7,7 @@ from schemas.screeningQuestionSchemas import (
     CreateScreeningResponse, ScreeningResponseDetail, ScreeningResponseSummary,
     PublicScreeningQuestion, ReorderQuestions
 )
-from authMiddleware.authMiddleware import get_current_user
+from authMiddleware.authMiddleware import check_for_authentication_cookie
 from authMiddleware.roleMiddleware import require_admin
 
 router = APIRouter()

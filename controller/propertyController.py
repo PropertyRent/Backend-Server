@@ -459,3 +459,951 @@ async def delete_property_media(media_id: str):
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete property media"
         )
+
+
+# === NEW INTEGRATED PROPERTY + MEDIA HANDLERS ===
+
+from fastapi import UploadFile
+from config.fileUpload import process_property_media, handle_general_media_upload
+import json
+
+def parse_comma_separated_list(value: Optional[str]) -> Optional[List[str]]:
+    """Parse comma-separated string into list"""
+    if not value or not value.strip():
+        return None
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+async def handle_create_property(
+    title: str,
+    property_type: str,
+    status: str,
+    price: float,
+    description: Optional[str] = None,
+    furnishing: Optional[str] = None,
+    area_sqft: Optional[float] = None,
+    bedrooms: Optional[int] = None,
+    bathrooms: Optional[int] = None,
+    floors: Optional[int] = None,
+    lease_term: Optional[str] = None,
+    application_fee: Optional[float] = None,
+    pet_policy: Optional[str] = None,
+    property_management_contact: Optional[str] = None,
+    website: Optional[str] = None,
+    deposit: Optional[float] = None,
+    address: Optional[str] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    pincode: Optional[str] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    utilities: Optional[str] = None,
+    amenities: Optional[str] = None,
+    appliances_included: Optional[str] = None,
+    media_files: Optional[List[UploadFile]] = None
+):
+    """Create property with optional media files"""
+    try:
+        print(f"🏠 Creating new property: {title}")
+        
+        # Parse JSON fields from comma-separated strings
+        utilities_list = parse_comma_separated_list(utilities)
+        amenities_list = parse_comma_separated_list(amenities)
+        appliances_list = parse_comma_separated_list(appliances_included)
+        
+        # Create property data
+        property_data = {
+            "title": title,
+            "property_type": property_type,
+            "status": status,
+            "price": price,
+            "description": description,
+            "furnishing": furnishing,
+            "area_sqft": area_sqft,
+            "bedrooms": bedrooms,
+            "bathrooms": bathrooms,
+            "floors": floors,
+            "lease_term": lease_term,
+            "application_fee": application_fee,
+            "pet_policy": pet_policy,
+            "property_management_contact": property_management_contact,
+            "website": website,
+            "deposit": deposit,
+            "address": address,
+            "city": city,
+            "state": state,
+            "pincode": pincode,
+            "latitude": latitude,
+            "longitude": longitude,
+            "utilities": utilities_list,
+            "amenities": amenities_list,
+            "appliances_included": appliances_list
+        }
+        
+        # Remove None values
+        property_data = {k: v for k, v in property_data.items() if v is not None}
+        
+        async with in_transaction():
+            # Create the property
+            new_property = await Property.create(**property_data)
+            print(f"✅ Property created with ID: {new_property.id}")
+            
+            media_results = []
+            
+            # Debug media files
+            print(f"🔍 Debug: media_files = {media_files}")
+            print(f"🔍 Debug: media_files type = {type(media_files)}")
+            if media_files:
+                print(f"🔍 Debug: len(media_files) = {len(media_files)}")
+                for i, mf in enumerate(media_files):
+                    print(f"🔍 Debug: media_file[{i}] = {mf}, filename = {getattr(mf, 'filename', 'NO_FILENAME')}")
+            
+            # Process media files using general upload function
+            if media_files and len(media_files) > 0:
+                print(f"📸 Processing {len(media_files)} media files using general upload function...")
+                
+                try:
+                    # Use the new general media upload function
+                    upload_result = await handle_general_media_upload(
+                        files=media_files,
+                        upload_type="property",
+                        max_files=20,
+                        compress_images=True,
+                        quality=85,
+                        max_width=1920,
+                        max_height=1080
+                    )
+                    
+                    if upload_result['success'] and upload_result['processed_files']:
+                        print(f"📸 Successfully processed {upload_result['file_count']} files")
+                        
+                        # Create database records for each processed file
+                        for i, (base64_url, file_info) in enumerate(zip(upload_result['processed_files'], upload_result['file_info'])):
+                            try:
+                                media_record = await PropertyMedia.create(
+                                    property=new_property,
+                                    media_type=file_info.get('media_type', 'image'),
+                                    url=base64_url,
+                                    is_cover=(i == 0)  # First image is cover by default
+                                )
+                                
+                                media_results.append({
+                                    "id": str(media_record.id),
+                                    "media_type": media_record.media_type,
+                                    "url": media_record.url,
+                                    "is_cover": media_record.is_cover,
+                                    "created_at": media_record.created_at.isoformat(),
+                                    "updated_at": media_record.updated_at.isoformat(),
+                                    "original_filename": file_info.get('original_filename'),
+                                    "file_size_mb": file_info.get('size_mb')
+                                })
+                                
+                                print(f"✅ Database record created for file {i+1}")
+                                
+                            except Exception as db_error:
+                                print(f"❌ Failed to create database record for file {i+1}: {db_error}")
+                    
+                    # Log any errors from processing
+                    if upload_result['errors']:
+                        print(f"⚠️ Some files had errors: {upload_result['errors']}")
+                    
+                    print(f"✅ Final result: {len(media_results)} media files successfully added to property")
+                    
+                except Exception as upload_error:
+                    print(f"❌ Media upload processing failed: {upload_error}")
+                    # Continue with property creation even if media fails
+        
+        # Return complete property data
+        return {
+            "success": True,
+            "message": f"Property created successfully with {len(media_results)} media files",
+            "data": {
+                "id": str(new_property.id),
+                "title": new_property.title,
+                "description": new_property.description,
+                "property_type": new_property.property_type,
+                "status": new_property.status,
+                "furnishing": new_property.furnishing,
+                "area_sqft": float(new_property.area_sqft) if new_property.area_sqft else None,
+                "bedrooms": new_property.bedrooms,
+                "bathrooms": new_property.bathrooms,
+                "floors": new_property.floors,
+                "utilities": new_property.utilities,
+                "amenities": new_property.amenities,
+                "appliances_included": new_property.appliances_included,
+                "lease_term": new_property.lease_term,
+                "application_fee": float(new_property.application_fee) if new_property.application_fee else None,
+                "pet_policy": new_property.pet_policy,
+                "property_management_contact": new_property.property_management_contact,
+                "website": new_property.website,
+                "price": float(new_property.price),
+                "deposit": float(new_property.deposit) if new_property.deposit else None,
+                "address": new_property.address,
+                "city": new_property.city,
+                "state": new_property.state,
+                "pincode": new_property.pincode,
+                "latitude": float(new_property.latitude) if new_property.latitude else None,
+                "longitude": float(new_property.longitude) if new_property.longitude else None,
+                "available_from": new_property.available_from.isoformat() if new_property.available_from else None,
+                "created_at": new_property.created_at.isoformat(),
+                "updated_at": new_property.updated_at.isoformat(),
+                "media": media_results,
+                "media_count": len(media_results)
+            }
+        }
+        
+    except Exception as e:
+        print(f"❌ Property creation failed: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create property: {str(e)}"
+        )
+
+
+async def handle_update_property(
+    property_id: str,
+    title: Optional[str] = None,
+    property_type: Optional[str] = None,
+    status: Optional[str] = None,
+    price: Optional[float] = None,
+    description: Optional[str] = None,
+    furnishing: Optional[str] = None,
+    area_sqft: Optional[float] = None,
+    bedrooms: Optional[int] = None,
+    bathrooms: Optional[int] = None,
+    floors: Optional[int] = None,
+    lease_term: Optional[str] = None,
+    application_fee: Optional[float] = None,
+    pet_policy: Optional[str] = None,
+    property_management_contact: Optional[str] = None,
+    website: Optional[str] = None,
+    deposit: Optional[float] = None,
+    address: Optional[str] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    pincode: Optional[str] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    utilities: Optional[str] = None,
+    amenities: Optional[str] = None,
+    appliances_included: Optional[str] = None,
+    media_files: Optional[List[UploadFile]] = None,
+    set_cover_media_id: Optional[str] = None,
+    remove_media_ids: Optional[str] = None  # Comma-separated media IDs to remove
+):
+    """Update property with optional media operations"""
+    try:
+        print(f"🏠 Updating property: {property_id}")
+        
+        # Check if property exists
+        property_obj = await Property.get_or_none(id=property_id).select_related('media')
+        if not property_obj:
+            raise HTTPException(
+                status_code=HTTP_404_NOT_FOUND,
+                detail="Property not found"
+            )
+        
+        async with in_transaction():
+            # Prepare update data
+            update_data = {}
+            
+            # Parse comma-separated list fields
+            if utilities is not None:
+                update_data["utilities"] = parse_comma_separated_list(utilities)
+            if amenities is not None:
+                update_data["amenities"] = parse_comma_separated_list(amenities)
+            if appliances_included is not None:
+                update_data["appliances_included"] = parse_comma_separated_list(appliances_included)
+            
+            # Add basic fields if provided
+            field_mapping = {
+                "title": title,
+                "property_type": property_type,
+                "status": status,
+                "price": price,
+                "description": description,
+                "furnishing": furnishing,
+                "area_sqft": area_sqft,
+                "bedrooms": bedrooms,
+                "bathrooms": bathrooms,
+                "floors": floors,
+                "lease_term": lease_term,
+                "application_fee": application_fee,
+                "pet_policy": pet_policy,
+                "property_management_contact": property_management_contact,
+                "website": website,
+                "deposit": deposit,
+                "address": address,
+                "city": city,
+                "state": state,
+                "pincode": pincode,
+                "latitude": latitude,
+                "longitude": longitude
+            }
+            
+            for field_name, field_value in field_mapping.items():
+                if field_value is not None:
+                    update_data[field_name] = field_value
+            
+            # Update property if there's data to update
+            if update_data:
+                print(f"📝 Updating fields: {list(update_data.keys())}")
+                await Property.filter(id=property_id).update(**update_data)
+                print("✅ Property basic fields updated")
+            
+            # Handle media removal
+            media_removed_count = 0
+            if remove_media_ids and remove_media_ids.strip():
+                remove_ids = [id.strip() for id in remove_media_ids.split(',') if id.strip()]
+                print(f"🗑️ Removing media IDs: {remove_ids}")
+                
+                for media_id in remove_ids:
+                    try:
+                        deleted_count = await PropertyMedia.filter(
+                            id=media_id, 
+                            property_id=property_id
+                        ).delete()
+                        if deleted_count > 0:
+                            media_removed_count += 1
+                            print(f"✅ Removed media {media_id}")
+                        else:
+                            print(f"⚠️ Media {media_id} not found or doesn't belong to this property")
+                    except Exception as e:
+                        print(f"❌ Failed to remove media {media_id}: {e}")
+            
+            # Handle cover image setting
+            if set_cover_media_id and set_cover_media_id.strip():
+                print(f"🎯 Setting cover image: {set_cover_media_id}")
+                
+                # Remove cover from all existing media
+                await PropertyMedia.filter(property_id=property_id).update(is_cover=False)
+                
+                # Set new cover
+                cover_updated = await PropertyMedia.filter(
+                    id=set_cover_media_id, 
+                    property_id=property_id
+                ).update(is_cover=True)
+                
+                if cover_updated > 0:
+                    print("✅ Cover image updated")
+                else:
+                    print("⚠️ Cover media not found or doesn't belong to this property")
+            
+            # Handle new media files
+            media_added_count = 0
+            new_media_results = []
+            if media_files and len(media_files) > 0:
+                print(f"📸 Adding {len(media_files)} new media files...")
+                
+                for i, media_file in enumerate(media_files):
+                    if media_file.filename:
+                        try:
+                            print(f"📸 Processing new file {i+1}: {media_file.filename}")
+                            
+                            # Determine media type
+                            media_type = "image"
+                            if media_file.content_type and media_file.content_type.startswith("video/"):
+                                media_type = "video"
+                            
+                            # Process the media file
+                            base64_url = await process_property_media(media_file, media_type)
+                            
+                            # Create media record
+                            media_record = await PropertyMedia.create(
+                                property=property_obj,
+                                media_type=media_type,
+                                url=base64_url,
+                                is_cover=False  # Don't auto-set as cover for updates
+                            )
+                            
+                            new_media_results.append({
+                                "id": str(media_record.id),
+                                "media_type": media_record.media_type,
+                                "url": media_record.url,
+                                "is_cover": media_record.is_cover,
+                                "created_at": media_record.created_at.isoformat(),
+                                "updated_at": media_record.updated_at.isoformat()
+                            })
+                            
+                            media_added_count += 1
+                            print(f"✅ New media file {i+1} added successfully")
+                            
+                        except Exception as media_error:
+                            print(f"❌ Failed to add media file {i+1}: {media_error}")
+        
+        # Get updated property with current media
+        updated_property = await Property.get(id=property_id).prefetch_related('media')
+        current_media = await PropertyMedia.filter(property_id=property_id).all()
+        
+        # Format current media data
+        current_media_data = []
+        for media in current_media:
+            current_media_data.append({
+                "id": str(media.id),
+                "media_type": media.media_type,
+                "url": media.url,
+                "is_cover": media.is_cover,
+                "created_at": media.created_at.isoformat(),
+                "updated_at": media.updated_at.isoformat()
+            })
+        
+        # Create summary message
+        operations = []
+        if update_data:
+            operations.append(f"updated {len(update_data)} fields")
+        if media_added_count > 0:
+            operations.append(f"added {media_added_count} media files")
+        if media_removed_count > 0:
+            operations.append(f"removed {media_removed_count} media files")
+        if set_cover_media_id:
+            operations.append("updated cover image")
+        
+        operation_summary = ", ".join(operations) if operations else "no changes made"
+        
+        return {
+            "success": True,
+            "message": f"Property updated successfully: {operation_summary}",
+            "data": {
+                "id": str(updated_property.id),
+                "title": updated_property.title,
+                "description": updated_property.description,
+                "property_type": updated_property.property_type,
+                "status": updated_property.status,
+                "furnishing": updated_property.furnishing,
+                "area_sqft": float(updated_property.area_sqft) if updated_property.area_sqft else None,
+                "bedrooms": updated_property.bedrooms,
+                "bathrooms": updated_property.bathrooms,
+                "floors": updated_property.floors,
+                "utilities": updated_property.utilities,
+                "amenities": updated_property.amenities,
+                "appliances_included": updated_property.appliances_included,
+                "lease_term": updated_property.lease_term,
+                "application_fee": float(updated_property.application_fee) if updated_property.application_fee else None,
+                "pet_policy": updated_property.pet_policy,
+                "property_management_contact": updated_property.property_management_contact,
+                "website": updated_property.website,
+                "price": float(updated_property.price),
+                "deposit": float(updated_property.deposit) if updated_property.deposit else None,
+                "address": updated_property.address,
+                "city": updated_property.city,
+                "state": updated_property.state,
+                "pincode": updated_property.pincode,
+                "latitude": float(updated_property.latitude) if updated_property.latitude else None,
+                "longitude": float(updated_property.longitude) if updated_property.longitude else None,
+                "available_from": updated_property.available_from.isoformat() if updated_property.available_from else None,
+                "created_at": updated_property.created_at.isoformat(),
+                "updated_at": updated_property.updated_at.isoformat(),
+                "media": current_media_data,
+                "media_count": len(current_media_data),
+                "operations_performed": {
+                    "fields_updated": len(update_data),
+                    "media_added": media_added_count,
+                    "media_removed": media_removed_count,
+                    "cover_updated": bool(set_cover_media_id)
+                }
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Property update failed: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update property: {str(e)}"
+        )
+
+
+async def handle_delete_property(property_id: str):
+    """Delete property and all its media"""
+    try:
+        print(f"🗑️ Deleting property: {property_id}")
+        
+        # Check if property exists
+        property_obj = await Property.get_or_none(id=property_id)
+        if not property_obj:
+            raise HTTPException(
+                status_code=HTTP_404_NOT_FOUND,
+                detail="Property not found"
+            )
+        
+        async with in_transaction():
+            # Delete all media first
+            media_count = await PropertyMedia.filter(property_id=property_id).count()
+            await PropertyMedia.filter(property_id=property_id).delete()
+            print(f"🗑️ Deleted {media_count} media records")
+            
+            # Delete the property
+            await Property.filter(id=property_id).delete()
+            print("✅ Property deleted successfully")
+        
+        return {
+            "success": True,
+            "message": f"Property and {media_count} associated media files deleted successfully",
+            "data": {
+                "deleted_property_id": property_id,
+                "deleted_media_count": media_count
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Property deletion failed: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete property: {str(e)}"
+        )
+
+
+async def handle_get_properties_admin(
+    page: int = 1,
+    limit: int = 10,
+    property_type: Optional[str] = None,
+    status: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    bedrooms: Optional[int] = None,
+    bathrooms: Optional[int] = None,
+    furnishing: Optional[str] = None,
+    search: Optional[str] = None
+):
+    """Get all properties for admin with advanced filtering"""
+    try:
+        print(f"👑 Admin fetching properties - Page {page}, Limit {limit}")
+        
+        # Build query
+        query = Property.all()
+        
+        # Apply filters
+        if property_type:
+            query = query.filter(property_type=property_type)
+            print(f"🔍 Filter: property_type = {property_type}")
+        
+        if status:
+            query = query.filter(status=status)
+            print(f"🔍 Filter: status = {status}")
+        
+        if min_price is not None:
+            query = query.filter(price__gte=min_price)
+            print(f"🔍 Filter: price >= {min_price}")
+        
+        if max_price is not None:
+            query = query.filter(price__lte=max_price)
+            print(f"🔍 Filter: price <= {max_price}")
+        
+        if city:
+            query = query.filter(city__icontains=city)
+            print(f"🔍 Filter: city contains '{city}'")
+        
+        if state:
+            query = query.filter(state__icontains=state)
+            print(f"🔍 Filter: state contains '{state}'")
+        
+        if bedrooms is not None:
+            query = query.filter(bedrooms=bedrooms)
+            print(f"🔍 Filter: bedrooms = {bedrooms}")
+        
+        if bathrooms is not None:
+            query = query.filter(bathrooms=bathrooms)
+            print(f"🔍 Filter: bathrooms = {bathrooms}")
+        
+        if furnishing:
+            query = query.filter(furnishing=furnishing)
+            print(f"🔍 Filter: furnishing = {furnishing}")
+        
+        if search and search.strip():
+            # Search in title, description, address using separate filters
+            search_term = search.strip()
+            # For OR operation without Q, we need to run multiple queries and combine
+            title_matches = await Property.filter(title__icontains=search_term).values_list('id', flat=True)
+            desc_matches = await Property.filter(description__icontains=search_term).values_list('id', flat=True)
+            addr_matches = await Property.filter(address__icontains=search_term).values_list('id', flat=True)
+            
+            # Combine all matching IDs
+            all_matching_ids = set(title_matches) | set(desc_matches) | set(addr_matches)
+            
+            if all_matching_ids:
+                query = query.filter(id__in=list(all_matching_ids))
+            else:
+                # No matches found, return empty result
+                query = query.filter(id=-1)  # This will return no results
+            
+            print(f"🔍 Search: '{search_term}' found {len(all_matching_ids)} matches")
+        
+        # Get total count before pagination
+        total_count = await query.count()
+        
+        # Apply pagination and get results with media
+        offset = (page - 1) * limit
+        properties = await query.offset(offset).limit(limit).prefetch_related('media').all()
+        
+        # Format the results
+        properties_data = []
+        for property_obj in properties:
+            # Get media for this property
+            media_data = []
+            for media in property_obj.media:
+                media_data.append({
+                    "id": str(media.id),
+                    "media_type": media.media_type,
+                    "url": media.url,
+                    "is_cover": media.is_cover,
+                    "created_at": media.created_at.isoformat(),
+                    "updated_at": media.updated_at.isoformat()
+                })
+            
+            # Sort media - cover first, then by creation date
+            media_data.sort(key=lambda x: (not x["is_cover"], x["created_at"]))
+            
+            properties_data.append({
+                "id": str(property_obj.id),
+                "title": property_obj.title,
+                "description": property_obj.description,
+                "property_type": property_obj.property_type,
+                "status": property_obj.status,
+                "furnishing": property_obj.furnishing,
+                "area_sqft": float(property_obj.area_sqft) if property_obj.area_sqft else None,
+                "bedrooms": property_obj.bedrooms,
+                "bathrooms": property_obj.bathrooms,
+                "floors": property_obj.floors,
+                "utilities": property_obj.utilities,
+                "amenities": property_obj.amenities,
+                "appliances_included": property_obj.appliances_included,
+                "lease_term": property_obj.lease_term,
+                "application_fee": float(property_obj.application_fee) if property_obj.application_fee else None,
+                "pet_policy": property_obj.pet_policy,
+                "property_management_contact": property_obj.property_management_contact,
+                "website": property_obj.website,
+                "price": float(property_obj.price),
+                "deposit": float(property_obj.deposit) if property_obj.deposit else None,
+                "address": property_obj.address,
+                "city": property_obj.city,
+                "state": property_obj.state,
+                "pincode": property_obj.pincode,
+                "latitude": float(property_obj.latitude) if property_obj.latitude else None,
+                "longitude": float(property_obj.longitude) if property_obj.longitude else None,
+                "available_from": property_obj.available_from.isoformat() if property_obj.available_from else None,
+                "created_at": property_obj.created_at.isoformat(),
+                "updated_at": property_obj.updated_at.isoformat(),
+                "media": media_data,
+                "media_count": len(media_data)
+            })
+        
+        # Calculate pagination info
+        total_pages = (total_count + limit - 1) // limit  # Ceiling division
+        
+        print(f"✅ Found {len(properties)} properties on page {page}/{total_pages}")
+        
+        return {
+            "success": True,
+            "message": f"Found {total_count} properties",
+            "data": properties_data,
+            "pagination": {
+                "current_page": page,
+                "per_page": limit,
+                "total_count": total_count,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1
+            },
+            "filters_applied": {
+                "property_type": property_type,
+                "status": status,
+                "min_price": min_price,
+                "max_price": max_price,
+                "city": city,
+                "state": state,
+                "bedrooms": bedrooms,
+                "bathrooms": bathrooms,
+                "furnishing": furnishing,
+                "search": search
+            }
+        }
+        
+    except Exception as e:
+        print(f"❌ Failed to fetch properties: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch properties: {str(e)}"
+        )
+
+
+async def handle_get_properties_public(
+    page: int = 1,
+    limit: int = 10,
+    property_type: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    bedrooms: Optional[int] = None,
+    bathrooms: Optional[int] = None,
+    furnishing: Optional[str] = None,
+    search: Optional[str] = None
+):
+    """Get available properties for public/users"""
+    try:
+        print(f"👥 Public fetching available properties - Page {page}, Limit {limit}")
+        
+        # Base query - only available properties
+        query = Property.filter(status="available")
+        
+        # Apply filters (same as admin but only for available properties)
+        if property_type:
+            query = query.filter(property_type=property_type)
+        
+        if min_price is not None:
+            query = query.filter(price__gte=min_price)
+        
+        if max_price is not None:
+            query = query.filter(price__lte=max_price)
+        
+        if city:
+            query = query.filter(city__icontains=city)
+        
+        if state:
+            query = query.filter(state__icontains=state)
+        
+        if bedrooms is not None:
+            query = query.filter(bedrooms=bedrooms)
+        
+        if bathrooms is not None:
+            query = query.filter(bathrooms=bathrooms)
+        
+        if furnishing:
+            query = query.filter(furnishing=furnishing)
+        
+        if search and search.strip():
+            search_term = search.strip()
+            # For OR operation without Q, we need to run multiple queries and combine
+            title_matches = await Property.filter(status="available", title__icontains=search_term).values_list('id', flat=True)
+            desc_matches = await Property.filter(status="available", description__icontains=search_term).values_list('id', flat=True)
+            addr_matches = await Property.filter(status="available", address__icontains=search_term).values_list('id', flat=True)
+            
+            # Combine all matching IDs
+            all_matching_ids = set(title_matches) | set(desc_matches) | set(addr_matches)
+            
+            if all_matching_ids:
+                query = query.filter(id__in=list(all_matching_ids))
+            else:
+                # No matches found, return empty result
+                query = query.filter(id=-1)  # This will return no results
+        
+        # Get total count and results
+        total_count = await query.count()
+        offset = (page - 1) * limit
+        properties = await query.offset(offset).limit(limit).prefetch_related('media').all()
+        
+        # Format results (same as admin but we can hide sensitive info if needed)
+        properties_data = []
+        for property_obj in properties:
+            media_data = []
+            for media in property_obj.media:
+                media_data.append({
+                    "id": str(media.id),
+                    "media_type": media.media_type,
+                    "url": media.url,
+                    "is_cover": media.is_cover
+                })
+            
+            media_data.sort(key=lambda x: (not x["is_cover"], x["created_at"] if "created_at" in x else ""))
+            
+            properties_data.append({
+                "id": str(property_obj.id),
+                "title": property_obj.title,
+                "description": property_obj.description,
+                "property_type": property_obj.property_type,
+                "status": property_obj.status,
+                "furnishing": property_obj.furnishing,
+                "area_sqft": float(property_obj.area_sqft) if property_obj.area_sqft else None,
+                "bedrooms": property_obj.bedrooms,
+                "bathrooms": property_obj.bathrooms,
+                "floors": property_obj.floors,
+                "utilities": property_obj.utilities,
+                "amenities": property_obj.amenities,
+                "appliances_included": property_obj.appliances_included,
+                "lease_term": property_obj.lease_term,
+                "application_fee": float(property_obj.application_fee) if property_obj.application_fee else None,
+                "pet_policy": property_obj.pet_policy,
+                "property_management_contact": property_obj.property_management_contact,
+                "website": property_obj.website,
+                "price": float(property_obj.price),
+                "deposit": float(property_obj.deposit) if property_obj.deposit else None,
+                "address": property_obj.address,
+                "city": property_obj.city,
+                "state": property_obj.state,
+                "pincode": property_obj.pincode,
+                "latitude": float(property_obj.latitude) if property_obj.latitude else None,
+                "longitude": float(property_obj.longitude) if property_obj.longitude else None,
+                "available_from": property_obj.available_from.isoformat() if property_obj.available_from else None,
+                "media": media_data,
+                "media_count": len(media_data)
+            })
+        
+        total_pages = (total_count + limit - 1) // limit
+        
+        print(f"✅ Found {len(properties)} available properties")
+        
+        return {
+            "success": True,
+            "message": f"Found {total_count} available properties",
+            "data": properties_data,
+            "pagination": {
+                "current_page": page,
+                "per_page": limit,
+                "total_count": total_count,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1
+            }
+        }
+        
+    except Exception as e:
+        print(f"❌ Failed to fetch public properties: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch properties: {str(e)}"
+        )
+
+
+async def handle_get_property_details(property_id: str, is_admin: bool = False):
+    """Get single property details"""
+    try:
+        print(f"🏠 Getting property details: {property_id} (admin: {is_admin})")
+        
+        # Build query
+        if is_admin:
+            # Admin can see all properties
+            property_obj = await Property.get_or_none(id=property_id).prefetch_related('media')
+        else:
+            # Users can only see available properties
+            property_obj = await Property.get_or_none(
+                id=property_id, 
+                status="available"
+            ).prefetch_related('media')
+        
+        if not property_obj:
+            raise HTTPException(
+                status_code=HTTP_404_NOT_FOUND,
+                detail="Property not found or not available"
+            )
+        
+        # Get media data
+        media_data = []
+        for media in property_obj.media:
+            media_item = {
+                "id": str(media.id),
+                "media_type": media.media_type,
+                "url": media.url,
+                "is_cover": media.is_cover
+            }
+            
+            # Add timestamps for admin
+            if is_admin:
+                media_item.update({
+                    "created_at": media.created_at.isoformat(),
+                    "updated_at": media.updated_at.isoformat()
+                })
+            
+            media_data.append(media_item)
+        
+        # Sort media - cover first
+        media_data.sort(key=lambda x: (not x["is_cover"]))
+        
+        # Build response data
+        property_data = {
+            "id": str(property_obj.id),
+            "title": property_obj.title,
+            "description": property_obj.description,
+            "property_type": property_obj.property_type,
+            "status": property_obj.status,
+            "furnishing": property_obj.furnishing,
+            "area_sqft": float(property_obj.area_sqft) if property_obj.area_sqft else None,
+            "bedrooms": property_obj.bedrooms,
+            "bathrooms": property_obj.bathrooms,
+            "floors": property_obj.floors,
+            "utilities": property_obj.utilities,
+            "amenities": property_obj.amenities,
+            "appliances_included": property_obj.appliances_included,
+            "lease_term": property_obj.lease_term,
+            "application_fee": float(property_obj.application_fee) if property_obj.application_fee else None,
+            "pet_policy": property_obj.pet_policy,
+            "property_management_contact": property_obj.property_management_contact,
+            "website": property_obj.website,
+            "price": float(property_obj.price),
+            "deposit": float(property_obj.deposit) if property_obj.deposit else None,
+            "address": property_obj.address,
+            "city": property_obj.city,
+            "state": property_obj.state,
+            "pincode": property_obj.pincode,
+            "latitude": float(property_obj.latitude) if property_obj.latitude else None,
+            "longitude": float(property_obj.longitude) if property_obj.longitude else None,
+            "available_from": property_obj.available_from.isoformat() if property_obj.available_from else None,
+            "media": media_data,
+            "media_count": len(media_data)
+        }
+        
+        # Add admin-only fields
+        if is_admin:
+            property_data.update({
+                "created_at": property_obj.created_at.isoformat(),
+                "updated_at": property_obj.updated_at.isoformat()
+            })
+        
+        print("✅ Property details retrieved successfully")
+        
+        return {
+            "success": True,
+            "message": "Property details retrieved successfully",
+            "data": property_data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Failed to get property details: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get property details: {str(e)}"
+        )
+
+
+# === COMPATIBILITY ALIASES FOR ROUTES ===
+# These provide backward compatibility with existing route imports
+
+async def handle_get_all_properties(
+    page: int = 1,
+    limit: int = 10,
+    property_type: Optional[str] = None,
+    status: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    bedrooms: Optional[int] = None,
+    bathrooms: Optional[int] = None,
+    furnishing: Optional[str] = None,
+    search: Optional[str] = None
+):
+    """Alias for admin get properties - backward compatibility"""
+    return await handle_get_properties_admin(
+        page=page,
+        limit=limit,
+        property_type=property_type,
+        status=status,
+        min_price=min_price,
+        max_price=max_price,
+        city=city,
+        state=state,
+        bedrooms=bedrooms,
+        bathrooms=bathrooms,
+        furnishing=furnishing,
+        search=search
+    )
+
+
+async def handle_get_property_by_id(property_id: str, is_admin: bool = True):
+    """Alias for get property details - backward compatibility"""
+    return await handle_get_property_details(property_id=property_id, is_admin=is_admin)

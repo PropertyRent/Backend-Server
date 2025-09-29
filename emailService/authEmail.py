@@ -37,7 +37,7 @@ async def send_verification_email(to_email: str, verify_url: str):
     html_content = f"""
     <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 30px;">
       <div style="max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 8px;">
-        <h2 style="color: #1a39ffff;">Welcome to AI-MVP-Local</h2>
+        <h2 style="color: #1a39ffff;">Welcome to Property-Rent</h2>
         <p>Thanks for signing up! Please verify your email address to activate your account.</p>
         <p>Click the button below to verify your email:</p>
         <a href="{verify_url}" style="
@@ -65,7 +65,7 @@ async def send_congrats_email(to_email: str):
       <div style="max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 8px;">
         <h2 style="color: #1a39ffff;">Congratulations</h2>
         <p>Your email has been successfully verified.</p>
-        <p>You can now log in and start using AI-MVP-Local with full access.</p>
+        <p>You can now log in and start using Property-Rent with full access.</p>
         <a href="{FRONTEND_URL}/login" style="
             display: inline-block;
             padding: 10px 20px;

@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Form
+from fastapi import APIRouter, Depends, UploadFile, File, Form, Request
+from authMiddleware.authMiddleware import check_for_authentication_cookie
 from controller.userController import (
     handle_get_profile,
     handle_update_profile,
-    handle_upload_profile_photo,
 )
 
-router = APIRouter(prefix="/user", tags=["User"])
+router = APIRouter(tags=["User"])
 
-router.get("/profile")(handle_get_profile)
+# Profile routes without additional dependencies since main.py handles it
+router.get("/profile", summary="Get current user profile")(handle_get_profile)
 router.put("/profile", summary="Update user profile with optional photo")(handle_update_profile)
-router.post("/profile/photo", summary="Upload/update profile photo only")(handle_upload_profile_photo)

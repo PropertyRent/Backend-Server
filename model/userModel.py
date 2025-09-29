@@ -13,7 +13,7 @@ class User(models.Model):
     full_name = fields.CharField(max_length=255, null=True)
     email = fields.CharField(max_length=255, unique=True, index=True)
     password = fields.CharField(max_length=255, null=True)
-    profile_photo = fields.TextField(null=True)  # Changed to TextField for base64 storage
+    profile_photo = fields.TextField(null=True)  
     phone = fields.CharField(max_length=20, null=True)
 
     role = fields.CharEnumField(UserRole, default=UserRole.USER)

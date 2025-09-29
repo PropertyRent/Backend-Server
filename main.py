@@ -1,13 +1,9 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.status import HTTP_401_UNAUTHORIZED
 
-
-from authMiddleware.authMiddleware import check_for_authentication_cookie
 from authMiddleware.roleMiddleware import authorize_roles
 from routes.authRoute import router as auth_router
 from routes.profileRoute import router as user_profile_router
@@ -37,19 +33,6 @@ app.add_middleware(
 
 # Session
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("JWT_SECRET", "supersecret"))
-
-# Auth middleware
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    if request.url.path.startswith("/api/user"):
-        token = request.cookies.get("token")
-        if not token or not check_for_authentication_cookie(token):
-            return JSONResponse(
-                status_code=HTTP_401_UNAUTHORIZED,
-                content={"detail": "Authentication required"},
-            )
-    response = await call_next(request)
-    return response
 
 # Routes
 app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
@@ -89,6 +72,11 @@ init_db(app)
 @app.on_event("startup")
 async def startup_event():
     print(f"Server running on port {PORT}")
+
 @app.get("/")
 async def root():
-    return {"message": "API is running"}
+    return {"message": "Backend API is running"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="127.0.0.1", port=PORT, reload=True)

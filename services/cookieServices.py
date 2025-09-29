@@ -2,7 +2,7 @@ from fastapi import Response
 from datetime import timedelta
 
 
-def set_token_cookie(response: Response, token: str, middleware_token: str):
+def set_token_cookie(response: Response, token: str):
     """
     Set HttpOnly and non-HttpOnly cookies for authentication.
     Equivalent to your setTokenCookie.js
@@ -28,13 +28,6 @@ def clear_token_cookie(response: Response):
     response.delete_cookie(
         key="token",
         path="/",
-        samesite="none",   
+        samesite="lax",   
         httponly=True
-    )
-
-    response.delete_cookie(
-        key="token_middleware",
-        path="/",
-        samesite="lax",
-        httponly=False
     )

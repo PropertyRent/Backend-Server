@@ -17,3 +17,9 @@ def authorize_roles(roles: List[str]):
             )
         return current_user  
     return role_checker
+
+
+# Convenience function for admin-only routes
+def require_admin():
+    """Convenience function for admin-only routes"""
+    return authorize_roles(["admin"])
