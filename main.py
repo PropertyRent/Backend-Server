@@ -26,13 +26,32 @@ FRONTEND_URL = os.getenv("FRONTEND_URL")
 app = FastAPI()
 
 # CORS
-allowed_origins = [FRONTEND_URL]
+allowed_origins = [
+    FRONTEND_URL,
+    "https://satishdev-staging-link.pixbit.me",  # Frontend staging domain
+    "http://localhost:5173",  # Local developmen 
+]
+
+# Remove None values if FRONTEND_URL is not set
+allowed_origins = [origin for origin in allowed_origins if origin is not None]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=[
+        "Content-Type", 
+        "Authorization", 
+        "Cookie", 
+        "Set-Cookie",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+    ],
+    expose_headers=["Set-Cookie"],
 )
 
 # Session
