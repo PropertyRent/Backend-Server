@@ -249,10 +249,42 @@ class ScreeningQuestionController:
                         answer_date=answer_data.answer_date
                     )
                 
-                return {
-                    "message": "Screening response submitted successfully",
-                    "response_id": str(response.id)
-                }
+                # AUTO-GENERATE PROPERTY RECOMMENDATIONS
+                try:
+                    from controller.propertyRecommendationController import create_property_recommendation_from_screening
+                    
+                    print(f"🔄 Auto-generating property recommendations for screening: {response.id}")
+                    
+                    # Create recommendations in the background (don't fail screening if this fails)
+                    recommendation_result = await create_property_recommendation_from_screening(str(response.id))
+                    
+                    property_count = recommendation_result.get('data', {}).get('property_count', 0)
+                    match_score = recommendation_result.get('data', {}).get('match_score', 0)
+                    
+                    print(f"✅ Auto-generated {property_count} property recommendations (score: {match_score})")
+                    
+                    return {
+                        "message": "Screening response submitted successfully",
+                        "response_id": str(response.id),
+                        "recommendations": {
+                            "generated": True,
+                            "property_count": property_count,
+                            "match_score": match_score,
+                            "message": f"Found {property_count} matching properties for you!"
+                        }
+                    }
+                    
+                except Exception as rec_error:
+                    print(f"⚠️ Failed to auto-generate recommendations: {rec_error}")
+                    # Don't fail the screening submission if recommendations fail
+                    return {
+                        "message": "Screening response submitted successfully",
+                        "response_id": str(response.id),
+                        "recommendations": {
+                            "generated": False,
+                            "message": "Recommendations will be generated shortly"
+                        }
+                    }
                 
         except HTTPException:
             raise

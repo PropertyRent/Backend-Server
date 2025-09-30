@@ -12,6 +12,8 @@ from routes.teamRoute import router as team_router
 from routes.contactRoute import router as contact_router
 from routes.screeningQuestionRoute import router as screening_router
 from routes.scheduleMeetingRoute import router as meeting_router
+from routes.noticeRoute import router as notice_router
+from routes.propertyRecommendationRoute import router as recommendation_router
 
 from dbConnection.dbConfig import init_db  
 
@@ -69,6 +71,17 @@ app.include_router(screening_router, prefix="/api", tags=["Screening Questions"]
 
 # Meeting scheduling routes - public scheduling, authenticated user management, admin approval
 app.include_router(meeting_router, prefix="/api", tags=["Schedule Meetings"])  # Mixed access levels
+
+# Notice routes - admin only for CRUD operations
+app.include_router(
+    notice_router,
+    prefix="/api",
+    tags=["Notices"],
+    dependencies=[Depends(authorize_roles(["admin"]))],  # Only admins can manage notices
+)
+
+# Property recommendation routes - mixed access (public recommendations, admin management)
+app.include_router(recommendation_router, prefix="/api", tags=["Property Recommendations"])  # Mixed access levels
 
 init_db(app)
 

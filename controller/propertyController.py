@@ -974,79 +974,140 @@ async def handle_delete_property(property_id: str):
 async def handle_get_properties_admin(
     page: int = 1,
     limit: int = 10,
+    keyword: Optional[str] = None,
     property_type: Optional[str] = None,
-    status: Optional[str] = None,
-    min_price: Optional[float] = None,
-    max_price: Optional[float] = None,
     city: Optional[str] = None,
     state: Optional[str] = None,
+    furnishing: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
     bedrooms: Optional[int] = None,
     bathrooms: Optional[int] = None,
-    furnishing: Optional[str] = None,
-    search: Optional[str] = None
+    pets_allowed: Optional[bool] = None,
+    available_from_date: Optional[str] = None,
+    status: Optional[str] = None
 ):
-    """Get all properties for admin with advanced filtering"""
+    """Get all properties for admin with comprehensive filtering (admin can see all statuses)"""
     try:
         print(f"👑 Admin fetching properties - Page {page}, Limit {limit}")
+        print(f"🔍 Filters: keyword={keyword}, type={property_type}, city={city}, status={status}")
         
-        # Build query
+        # Base query - admin can see all properties regardless of status
         query = Property.all()
         
-        # Apply filters
-        if property_type:
-            query = query.filter(property_type=property_type)
-            print(f"🔍 Filter: property_type = {property_type}")
-        
-        if status:
-            query = query.filter(status=status)
-            print(f"🔍 Filter: status = {status}")
-        
-        if min_price is not None:
-            query = query.filter(price__gte=min_price)
-            print(f"🔍 Filter: price >= {min_price}")
-        
-        if max_price is not None:
-            query = query.filter(price__lte=max_price)
-            print(f"🔍 Filter: price <= {max_price}")
-        
-        if city:
-            query = query.filter(city__icontains=city)
-            print(f"🔍 Filter: city contains '{city}'")
-        
-        if state:
-            query = query.filter(state__icontains=state)
-            print(f"🔍 Filter: state contains '{state}'")
-        
-        if bedrooms is not None:
-            query = query.filter(bedrooms=bedrooms)
-            print(f"🔍 Filter: bedrooms = {bedrooms}")
-        
-        if bathrooms is not None:
-            query = query.filter(bathrooms=bathrooms)
-            print(f"🔍 Filter: bathrooms = {bathrooms}")
-        
-        if furnishing:
-            query = query.filter(furnishing=furnishing)
-            print(f"🔍 Filter: furnishing = {furnishing}")
-        
-        if search and search.strip():
-            # Search in title, description, address using separate filters
-            search_term = search.strip()
-            # For OR operation without Q, we need to run multiple queries and combine
+        # === TEXT SEARCH (keyword) ===
+        if keyword and keyword.strip():
+            search_term = keyword.strip()
+            print(f"🔍 Searching for keyword: '{search_term}'")
+            
+            # Search in multiple fields: title, description, property_type, city
             title_matches = await Property.filter(title__icontains=search_term).values_list('id', flat=True)
             desc_matches = await Property.filter(description__icontains=search_term).values_list('id', flat=True)
-            addr_matches = await Property.filter(address__icontains=search_term).values_list('id', flat=True)
+            type_matches = await Property.filter(property_type__icontains=search_term).values_list('id', flat=True)
+            city_matches = await Property.filter(city__icontains=search_term).values_list('id', flat=True)
             
-            # Combine all matching IDs
-            all_matching_ids = set(title_matches) | set(desc_matches) | set(addr_matches)
+            # Combine all matching IDs (OR operation)
+            all_matching_ids = set(title_matches) | set(desc_matches) | set(type_matches) | set(city_matches)
             
             if all_matching_ids:
                 query = query.filter(id__in=list(all_matching_ids))
             else:
                 # No matches found, return empty result
-                query = query.filter(id=-1)  # This will return no results
-            
-            print(f"🔍 Search: '{search_term}' found {len(all_matching_ids)} matches")
+                return JSONResponse(
+                    status_code=HTTP_200_OK,
+                    content={
+                        "success": True,
+                        "message": f"No properties found matching keyword '{search_term}'",
+                        "data": {
+                            "properties": [],
+                            "pagination": {
+                                "total_count": 0,
+                                "page": page,
+                                "limit": limit,
+                                "total_pages": 0
+                            }
+                        }
+                    }
+                )
+        
+        # === PROPERTY CHARACTERISTICS ===
+        if property_type:
+            query = query.filter(property_type__icontains=property_type)
+        
+        if city:
+            query = query.filter(city__icontains=city)
+        
+        if state:
+            query = query.filter(state__icontains=state)
+        
+        if furnishing:
+            query = query.filter(furnishing__icontains=furnishing)
+        
+        if status:
+            query = query.filter(status=status)
+            print(f"🔍 Filter: status = {status}")
+        
+        # === PRICE FILTERING (Min/Max only) ===
+        if min_price is not None:
+            query = query.filter(price__gte=min_price)
+        
+        if max_price is not None:
+            query = query.filter(price__lte=max_price)
+        
+        # === ROOM SPECIFICATIONS (Exact count only) ===
+        if bedrooms is not None:
+            query = query.filter(bedrooms=bedrooms)
+        
+        if bathrooms is not None:
+            query = query.filter(bathrooms=bathrooms)
+        
+        # === PET POLICY FILTERING ===
+        if pets_allowed is not None:
+            if pets_allowed:
+                # Search for pet-friendly keywords in pet_policy
+                pet_friendly_ids = await Property.filter(
+                    pet_policy__icontains="allowed"
+                ).values_list('id', flat=True)
+                
+                pet_friendly_ids2 = await Property.filter(
+                    pet_policy__icontains="yes"
+                ).values_list('id', flat=True)
+                
+                pet_friendly_ids3 = await Property.filter(
+                    pet_policy__icontains="welcome"
+                ).values_list('id', flat=True)
+                
+                all_pet_friendly = set(pet_friendly_ids) | set(pet_friendly_ids2) | set(pet_friendly_ids3)
+                
+                if all_pet_friendly:
+                    query = query.filter(id__in=list(all_pet_friendly))
+                else:
+                    # No pet-friendly properties found
+                    query = query.filter(id=-1)
+            else:
+                # Filter out pet-friendly properties
+                not_pet_friendly_ids = await Property.filter(
+                    pet_policy__icontains="not allowed"
+                ).values_list('id', flat=True)
+                
+                not_pet_friendly_ids2 = await Property.filter(
+                    pet_policy__icontains="no pets"
+                ).values_list('id', flat=True)
+                
+                all_not_pet_friendly = set(not_pet_friendly_ids) | set(not_pet_friendly_ids2)
+                
+                if all_not_pet_friendly:
+                    query = query.filter(id__in=list(all_not_pet_friendly))
+        
+        # === MOVE-IN DATE FILTERING ===
+        if available_from_date:
+            try:
+                from datetime import datetime
+                move_in_date = datetime.strptime(available_from_date, "%Y-%m-%d")
+                query = query.filter(available_from__lte=move_in_date)
+            except ValueError:
+                print(f"⚠️ Invalid date format: {available_from_date}")
+                pass
         
         # Get total count before pagination
         total_count = await query.count()
@@ -1110,33 +1171,52 @@ async def handle_get_properties_admin(
         # Calculate pagination info
         total_pages = (total_count + limit - 1) // limit  # Ceiling division
         
-        print(f"✅ Found {len(properties)} properties on page {page}/{total_pages}")
+        print(f"✅ Found {len(properties)} properties (Total: {total_count})")
         
-        return {
-            "success": True,
-            "message": f"Found {total_count} properties",
-            "data": properties_data,
-            "pagination": {
-                "current_page": page,
-                "per_page": limit,
-                "total_count": total_count,
-                "total_pages": total_pages,
-                "has_next": page < total_pages,
-                "has_prev": page > 1
-            },
-            "filters_applied": {
-                "property_type": property_type,
-                "status": status,
-                "min_price": min_price,
-                "max_price": max_price,
-                "city": city,
-                "state": state,
-                "bedrooms": bedrooms,
-                "bathrooms": bathrooms,
-                "furnishing": furnishing,
-                "search": search
+        # Build filter summary for response
+        active_filters = {}
+        if keyword:
+            active_filters["keyword"] = keyword
+        if property_type:
+            active_filters["property_type"] = property_type
+        if city:
+            active_filters["city"] = city
+        if state:
+            active_filters["state"] = state
+        if status:
+            active_filters["status"] = status
+        if min_price or max_price:
+            active_filters["price_range"] = f"₹{min_price or 0} - ₹{max_price or 'unlimited'}"
+        if bedrooms:
+            active_filters["bedrooms"] = f"exactly {bedrooms}"
+        if bathrooms:
+            active_filters["bathrooms"] = f"exactly {bathrooms}"
+        if pets_allowed is not None:
+            active_filters["pets"] = "allowed" if pets_allowed else "not allowed"
+        if available_from_date:
+            active_filters["available_from"] = available_from_date
+        
+        return JSONResponse(
+            status_code=HTTP_200_OK,
+            content={
+                "success": True,
+                "message": f"[ADMIN] Found {total_count} properties" + (f" matching your filters" if active_filters else ""),
+                "data": {
+                    "properties": properties_data,
+                    "pagination": {
+                        "current_page": page,
+                        "per_page": limit,
+                        "total_count": total_count,
+                        "total_pages": total_pages,
+                        "has_next": page < total_pages,
+                        "has_prev": page > 1,
+                        "showing": f"{min(offset + 1, total_count)}-{min(offset + limit, total_count)} of {total_count}"
+                    },
+                    "filters_applied": active_filters,
+                    "filter_count": len(active_filters)
+                }
             }
-        }
+        )
         
     except Exception as e:
         print(f"❌ Failed to fetch properties: {e}")
@@ -1149,32 +1229,68 @@ async def handle_get_properties_admin(
 async def handle_get_properties_public(
     page: int = 1,
     limit: int = 10,
+    keyword: Optional[str] = None,
     property_type: Optional[str] = None,
-    min_price: Optional[float] = None,
-    max_price: Optional[float] = None,
     city: Optional[str] = None,
     state: Optional[str] = None,
+    furnishing: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
     bedrooms: Optional[int] = None,
     bathrooms: Optional[int] = None,
-    furnishing: Optional[str] = None,
-    search: Optional[str] = None
+    pets_allowed: Optional[bool] = None,
+    available_from_date: Optional[str] = None,
+    status: Optional[str] = None
 ):
-    """Get available properties for public/users"""
+    """Get available properties for public/users with comprehensive filtering"""
     try:
-        print(f"👥 Public fetching available properties - Page {page}, Limit {limit}")
+        print(f"👥 Public fetching properties - Page {page}, Limit {limit}")
+        print(f"🔍 Filters: keyword={keyword}, type={property_type}, city={city}, price={min_price}-{max_price}")
         
-        # Base query - only available properties
-        query = Property.filter(status="available")
+        # Base query - default to available properties unless status is specified
+        if status:
+            query = Property.filter(status=status)
+        else:
+            query = Property.filter(status="available")
         
-        # Apply filters (same as admin but only for available properties)
+        # === TEXT SEARCH (keyword) ===
+        if keyword and keyword.strip():
+            search_term = keyword.strip()
+            print(f"🔍 Searching for keyword: '{search_term}'")
+            
+            # Search in multiple fields: title, description, property_type, city
+            title_matches = await Property.filter(title__icontains=search_term).values_list('id', flat=True)
+            desc_matches = await Property.filter(description__icontains=search_term).values_list('id', flat=True)
+            type_matches = await Property.filter(property_type__icontains=search_term).values_list('id', flat=True)
+            city_matches = await Property.filter(city__icontains=search_term).values_list('id', flat=True)
+            
+            # Combine all matching IDs (OR operation)
+            all_matching_ids = set(title_matches) | set(desc_matches) | set(type_matches) | set(city_matches)
+            
+            if all_matching_ids:
+                query = query.filter(id__in=list(all_matching_ids))
+            else:
+                # No matches found, return empty result
+                return JSONResponse(
+                    status_code=HTTP_200_OK,
+                    content={
+                        "success": True,
+                        "message": f"No properties found matching keyword '{search_term}'",
+                        "data": {
+                            "properties": [],
+                            "pagination": {
+                                "total_count": 0,
+                                "page": page,
+                                "limit": limit,
+                                "total_pages": 0
+                            }
+                        }
+                    }
+                )
+        
+        # === PROPERTY CHARACTERISTICS ===
         if property_type:
-            query = query.filter(property_type=property_type)
-        
-        if min_price is not None:
-            query = query.filter(price__gte=min_price)
-        
-        if max_price is not None:
-            query = query.filter(price__lte=max_price)
+            query = query.filter(property_type__icontains=property_type)
         
         if city:
             query = query.filter(city__icontains=city)
@@ -1182,30 +1298,70 @@ async def handle_get_properties_public(
         if state:
             query = query.filter(state__icontains=state)
         
+        if furnishing:
+            query = query.filter(furnishing__icontains=furnishing)
+        
+        # === PRICE FILTERING ===
+        if min_price is not None:
+            query = query.filter(price__gte=min_price)
+        
+        if max_price is not None:
+            query = query.filter(price__lte=max_price)
+        
+        # === ROOM SPECIFICATIONS (Exact count only) ===
         if bedrooms is not None:
             query = query.filter(bedrooms=bedrooms)
         
         if bathrooms is not None:
             query = query.filter(bathrooms=bathrooms)
         
-        if furnishing:
-            query = query.filter(furnishing=furnishing)
-        
-        if search and search.strip():
-            search_term = search.strip()
-            # For OR operation without Q, we need to run multiple queries and combine
-            title_matches = await Property.filter(status="available", title__icontains=search_term).values_list('id', flat=True)
-            desc_matches = await Property.filter(status="available", description__icontains=search_term).values_list('id', flat=True)
-            addr_matches = await Property.filter(status="available", address__icontains=search_term).values_list('id', flat=True)
-            
-            # Combine all matching IDs
-            all_matching_ids = set(title_matches) | set(desc_matches) | set(addr_matches)
-            
-            if all_matching_ids:
-                query = query.filter(id__in=list(all_matching_ids))
+        # === PET POLICY FILTERING ===
+        if pets_allowed is not None:
+            if pets_allowed:
+                # Search for pet-friendly keywords in pet_policy
+                pet_friendly_ids = await Property.filter(
+                    pet_policy__icontains="allowed"
+                ).values_list('id', flat=True)
+                
+                pet_friendly_ids2 = await Property.filter(
+                    pet_policy__icontains="yes"
+                ).values_list('id', flat=True)
+                
+                pet_friendly_ids3 = await Property.filter(
+                    pet_policy__icontains="welcome"
+                ).values_list('id', flat=True)
+                
+                all_pet_friendly = set(pet_friendly_ids) | set(pet_friendly_ids2) | set(pet_friendly_ids3)
+                
+                if all_pet_friendly:
+                    query = query.filter(id__in=list(all_pet_friendly))
+                else:
+                    # No pet-friendly properties found
+                    query = query.filter(id=-1)
             else:
-                # No matches found, return empty result
-                query = query.filter(id=-1)  # This will return no results
+                # Filter out pet-friendly properties
+                not_pet_friendly_ids = await Property.filter(
+                    pet_policy__icontains="not allowed"
+                ).values_list('id', flat=True)
+                
+                not_pet_friendly_ids2 = await Property.filter(
+                    pet_policy__icontains="no pets"
+                ).values_list('id', flat=True)
+                
+                all_not_pet_friendly = set(not_pet_friendly_ids) | set(not_pet_friendly_ids2)
+                
+                if all_not_pet_friendly:
+                    query = query.filter(id__in=list(all_not_pet_friendly))
+        
+        # === MOVE-IN DATE FILTERING ===
+        if available_from_date:
+            try:
+                from datetime import datetime
+                move_in_date = datetime.strptime(available_from_date, "%Y-%m-%d")
+                query = query.filter(available_from__lte=move_in_date)
+            except ValueError:
+                print(f"⚠️ Invalid date format: {available_from_date}")
+                pass
         
         # Get total count and results
         total_count = await query.count()
@@ -1260,21 +1416,50 @@ async def handle_get_properties_public(
         
         total_pages = (total_count + limit - 1) // limit
         
-        print(f"✅ Found {len(properties)} available properties")
+        print(f"✅ Found {len(properties)} properties (Total: {total_count})")
         
-        return {
-            "success": True,
-            "message": f"Found {total_count} available properties",
-            "data": properties_data,
-            "pagination": {
-                "current_page": page,
-                "per_page": limit,
-                "total_count": total_count,
-                "total_pages": total_pages,
-                "has_next": page < total_pages,
-                "has_prev": page > 1
+        # Build filter summary for response
+        active_filters = {}
+        if keyword:
+            active_filters["keyword"] = keyword
+        if property_type:
+            active_filters["property_type"] = property_type
+        if city:
+            active_filters["city"] = city
+        if state:
+            active_filters["state"] = state
+        if min_price or max_price:
+            active_filters["price_range"] = f"₹{min_price or 0} - ₹{max_price or 'unlimited'}"
+        if bedrooms:
+            active_filters["bedrooms"] = f"exactly {bedrooms}"
+        if bathrooms:
+            active_filters["bathrooms"] = f"exactly {bathrooms}"
+        if pets_allowed is not None:
+            active_filters["pets"] = "allowed" if pets_allowed else "not allowed"
+        if available_from_date:
+            active_filters["available_from"] = available_from_date
+        
+        return JSONResponse(
+            status_code=HTTP_200_OK,
+            content={
+                "success": True,
+                "message": f"Found {total_count} properties" + (f" matching your filters" if active_filters else ""),
+                "data": {
+                    "properties": properties_data,
+                    "pagination": {
+                        "current_page": page,
+                        "per_page": limit,
+                        "total_count": total_count,
+                        "total_pages": total_pages,
+                        "has_next": page < total_pages,
+                        "has_prev": page > 1,
+                        "showing": f"{min(offset + 1, total_count)}-{min(offset + limit, total_count)} of {total_count}"
+                    },
+                    "filters_applied": active_filters,
+                    "filter_count": len(active_filters)
+                }
             }
-        }
+        )
         
     except Exception as e:
         print(f"❌ Failed to fetch public properties: {e}")

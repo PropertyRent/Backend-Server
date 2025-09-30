@@ -207,47 +207,87 @@ async def update_property_with_media(
 async def delete_property(property_id: str):
     return await handle_delete_property(property_id)
 
+
+
 # === PROPERTY VIEWING ROUTES (Public Access) ===
-# No authentication required - accessible to everyone
+# No authentication required - accessible to everyone including admins
 
 @router.get("/properties",
-    summary="Get all properties with filtering (Public Access)"
+    summary="Get all properties with comprehensive filtering"
 )
 async def get_all_properties(
-    page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
-    search: Optional[str] = Query(None),
-    property_type: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
-    city: Optional[str] = Query(None),
-    state: Optional[str] = Query(None),
-    min_price: Optional[float] = Query(None),
-    max_price: Optional[float] = Query(None),
-    bedrooms: Optional[int] = Query(None),
-    bathrooms: Optional[int] = Query(None),
-    furnishing: Optional[str] = Query(None)
+    # Pagination
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(20, ge=1, le=100, description="Number of properties per page"),
+    
+    # Text search - searches in title, description, property_type, city
+    keyword: Optional[str] = Query(None, description="Search keyword in title, description, type, city"),
+    
+    # Property characteristics
+    property_type: Optional[str] = Query(None, description="Property type (apartment, house, studio, etc.)"),
+    city: Optional[str] = Query(None, description="City name"),
+    state: Optional[str] = Query(None, description="State name"),
+    furnishing: Optional[str] = Query(None, description="Furnishing type (furnished, unfurnished, semi-furnished)"),
+    
+    # Price filtering
+    min_price: Optional[float] = Query(None, ge=0, description="Minimum price"),
+    max_price: Optional[float] = Query(None, ge=0, description="Maximum price"),
+    
+    # Room specifications
+    bedrooms: Optional[int] = Query(None, ge=0, description="Number of bedrooms"),
+    bathrooms: Optional[int] = Query(None, ge=0, description="Number of bathrooms"),
+    # Pet policy
+    pets_allowed: Optional[bool] = Query(None, description="Filter by pet-friendly properties"),
+    
+    # Move-in date filtering
+    available_from_date: Optional[str] = Query(None, description="Available from date (YYYY-MM-DD)"),
+    
+    # Property status (all users can filter by status)
+    status: Optional[str] = Query(None, description="Property status (available, rented, maintenance)")
 ):
-    # Always return public properties (no authentication required)
+    """
+    Get all properties with comprehensive filtering and search capabilities.
+    
+    **Search Options:**
+    - **keyword**: Searches in title, description, property_type, and city
+    - **Single filters**: property_type, city, bedrooms, bathrooms, etc.
+    - **Price Range**: min_price and max_price for budget filtering
+    - **Combination filters**: Use multiple parameters together
+    
+    **Examples:**
+    - `/properties?keyword=apartment&city=mumbai` - Search apartments in Mumbai
+    - `/properties?min_price=10000&max_price=25000&bedrooms=2` - 2BHK under ₹25k
+    - `/properties?min_price=15000` - Properties above ₹15,000
+    - `/properties?max_price=30000` - Properties under ₹30,000
+    - `/properties?pets_allowed=true&furnishing=furnished` - Pet-friendly furnished properties
+    """
+    # Use the public function which can handle all properties
+    # Admin users can access this same endpoint to see all properties
     return await handle_get_properties_public(
         page=page,
         limit=limit,
-        search=search,
+        keyword=keyword,
         property_type=property_type,
         city=city,
         state=state,
+        furnishing=furnishing,
         min_price=min_price,
         max_price=max_price,
         bedrooms=bedrooms,
         bathrooms=bathrooms,
-        furnishing=furnishing
+        pets_allowed=pets_allowed,
+        available_from_date=available_from_date,
+        status=status
     )
 
 @router.get("/properties/{property_id}",
-    summary="Get property details by ID (Public Access)"
+    summary="Get property details by ID"
 )
 async def get_property_by_id(property_id: str):
-    # Always return public view (no authentication required)
-    return await handle_get_property_by_id(property_id, is_admin=False)
+    # Public access - no authentication required
+    # Set is_admin=True to allow viewing all properties (not just available ones)
+    # This ensures admins and public users can see the same properties
+    return await handle_get_property_by_id(property_id, is_admin=True)
 
 # === PROPERTY COVER IMAGE ROUTES (Public Access) ===
 # Get cover images for properties - no authentication required

@@ -442,3 +442,66 @@ async def upload_single_file(
         raise HTTPException(status_code=400, detail=f"File upload failed: {'; '.join(errors)}")
     
     return result['processed_files'][0]
+
+
+# Document file support for notices
+SUPPORTED_DOCUMENT_FORMATS = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']
+MAX_DOCUMENT_SIZE = 100 * 1024 * 1024  # 100MB
+
+
+async def process_document_to_base64(file: UploadFile) -> str:
+    """Process document files (PDF, DOCX, DOC) to base64"""
+    try:
+        print(f"📄 Processing document: {file.filename}")
+        
+        # Read file content
+        file_content = await file.read()
+        file_size = len(file_content)
+        
+        # Check file size
+        if file_size > MAX_DOCUMENT_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Document file too large. Maximum size: {MAX_DOCUMENT_SIZE / (1024*1024)}MB"
+            )
+        
+        # Validate document type
+        content_type = getattr(file, 'content_type', '') or ''
+        filename = file.filename.lower()
+        
+        # Determine file type
+        if (content_type == 'application/pdf' or filename.endswith('.pdf')):
+            detected_type = 'application/pdf'
+        elif (content_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' or 
+              filename.endswith('.docx')):
+            detected_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        elif (content_type == 'application/msword' or filename.endswith('.doc')):
+            detected_type = 'application/msword'
+        else:
+            # Allow images as well for notices
+            if (content_type.startswith('image/') or 
+                filename.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp'))):
+                # Process as image
+                await file.seek(0)  # Reset file pointer
+                return await process_image_to_base64(file, compress=True, quality=85)
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Unsupported file type. Only PDF, DOCX, DOC, and image files are allowed for notices."
+                )
+        
+        # Convert to base64
+        base64_content = base64.b64encode(file_content).decode('utf-8')
+        base64_url = f"data:{detected_type};base64,{base64_content}"
+        
+        print(f"✅ Document processed successfully: {file.filename} ({file_size} bytes)")
+        return base64_url
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Document processing failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process document: {str(e)}"
+        )
