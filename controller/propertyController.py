@@ -1805,13 +1805,25 @@ async def get_recent_properties(limit: int = 3):
         
         properties_data = []
         for property_obj in recent_properties:
-            # Get cover image
+            # Get all media files for the property
+            media_files = []
             cover_image = None
+            
             if property_obj.media:
                 for media in property_obj.media:
-                    if media.media_type == "cover":
-                        cover_image = media.base64_data
-                        break
+                    media_data = {
+                        "id": str(media.id),
+                        "media_type": media.media_type.value,  # Convert enum to string
+                        "url": media.url,  # This contains the base64 data
+                        "is_cover": media.is_cover,
+                        "created_at": media.created_at.isoformat() if media.created_at else None,
+                        "updated_at": media.updated_at.isoformat() if media.updated_at else None
+                    }
+                    media_files.append(media_data)
+                    
+                    # Set cover image for backward compatibility
+                    if media.is_cover:
+                        cover_image = media.url
             
             property_data = {
                 "id": str(property_obj.id),
@@ -1819,15 +1831,33 @@ async def get_recent_properties(limit: int = 3):
                 "description": property_obj.description,
                 "property_type": property_obj.property_type,
                 "status": property_obj.status,
+                "furnishing": property_obj.furnishing,
                 "price": float(property_obj.price),
+                "deposit": float(property_obj.deposit) if property_obj.deposit else None,
                 "bedrooms": property_obj.bedrooms,
                 "bathrooms": property_obj.bathrooms,
+                "floors": property_obj.floors,
                 "area_sqft": float(property_obj.area_sqft) if property_obj.area_sqft else None,
+                "utilities": property_obj.utilities,
+                "amenities": property_obj.amenities,
+                "appliances_included": property_obj.appliances_included,
+                "lease_term": property_obj.lease_term,
+                "application_fee": float(property_obj.application_fee) if property_obj.application_fee else None,
+                "pet_policy": property_obj.pet_policy,
+                "property_management_contact": property_obj.property_management_contact,
+                "website": property_obj.website,
+                "address": property_obj.address,
                 "city": property_obj.city,
                 "state": property_obj.state,
-                "address": property_obj.address,
+                "pincode": property_obj.pincode,
+                "latitude": float(property_obj.latitude) if property_obj.latitude else None,
+                "longitude": float(property_obj.longitude) if property_obj.longitude else None,
+                "available_from": property_obj.available_from.isoformat() if property_obj.available_from else None,
                 "created_at": property_obj.created_at.isoformat() if property_obj.created_at else None,
-                "cover_image": cover_image
+                "updated_at": property_obj.updated_at.isoformat() if property_obj.updated_at else None,
+                "cover_image": cover_image,  # For backward compatibility
+                "media": media_files,  # All media files
+                "media_count": len(media_files)
             }
             properties_data.append(property_data)
         
@@ -1835,7 +1865,7 @@ async def get_recent_properties(limit: int = 3):
             status_code=HTTP_200_OK,
             content={
                 "success": True,
-                "message": f"Retrieved {len(properties_data)} recent properties",
+                "message": f"Retrieved {len(properties_data)} recent properties with media",
                 "data": properties_data,
                 "total": len(properties_data)
             }

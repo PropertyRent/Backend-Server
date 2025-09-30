@@ -339,7 +339,7 @@ async def get_admin_recent_properties(limit: int = Query(3, ge=1, le=10, descrip
     """
     Get recently created properties for admin dashboard.
     Returns properties ordered by creation date (newest first).
-    Includes basic property info and cover image.
+    Includes comprehensive property details and all associated media files.
     """
     return await get_recent_properties(limit)
 
