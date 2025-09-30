@@ -14,8 +14,8 @@ def set_token_cookie(response: Response, token: str):
         value=token,
         max_age=max_age,
         httponly=True,
-        secure=False,  
-        samesite="lax",
+        secure=True,  
+        samesite="none",
         path="/",
     )
 
@@ -28,6 +28,6 @@ def clear_token_cookie(response: Response):
     response.delete_cookie(
         key="token",
         path="/",
-        samesite="lax",   
+        samesite="none",   
         httponly=True
     )
