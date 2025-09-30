@@ -10,6 +10,7 @@ def set_token_cookie(response: Response, token: str):
     max_age = 60 * 60 * 24 * 30  
 
     response.set_cookie(
+        domain=".pixtbit.me",
         key="token",
         value=token,
         max_age=max_age,
@@ -26,6 +27,7 @@ def clear_token_cookie(response: Response):
     Equivalent to your clearTokenCookie.js
     """
     response.delete_cookie(
+        domain=".pixtbit.me",
         key="token",
         path="/",
         samesite="none",   
