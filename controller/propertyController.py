@@ -1749,3 +1749,101 @@ async def handle_get_all_property_cover_images():
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get property cover images: {str(e)}"
         )
+
+
+async def get_property_stats():
+    """Get property statistics for admin dashboard"""
+    try:
+        print("📊 Getting property statistics...")
+        
+        # Get total property count
+        total_properties = await Property.all().count()
+        print(f"Total properties: {total_properties}")
+        
+        # Get available properties count
+        available_properties = await Property.filter(status="available").count()
+        print(f"Available properties: {available_properties}")
+        
+        # Get rented properties count
+        rented_properties = await Property.filter(status="rented").count()
+        print(f"Rented properties: {rented_properties}")
+        
+        # Get maintenance properties count
+        maintenance_properties = await Property.filter(status="maintenance").count()
+        print(f"Maintenance properties: {maintenance_properties}")
+        
+        return JSONResponse(
+            status_code=HTTP_200_OK,
+            content={
+                "success": True,
+                "message": "Property statistics retrieved successfully",
+                "data": {
+                    "total_properties": total_properties,
+                    "available_properties": available_properties,
+                    "rented_properties": rented_properties,
+                    "maintenance_properties": maintenance_properties,
+                    "occupancy_rate": round((rented_properties / total_properties * 100), 2) if total_properties > 0 else 0
+                }
+            }
+        )
+        
+    except Exception as e:
+        print(f"❌ Error getting property statistics: {str(e)}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get property statistics: {str(e)}"
+        )
+
+
+async def get_recent_properties(limit: int = 3):
+    """Get recent properties for admin dashboard"""
+    try:
+        print(f"📋 Getting {limit} recent properties...")
+        
+        # Get recent properties ordered by created_at descending
+        recent_properties = await Property.all().order_by('-created_at').limit(limit).prefetch_related('media')
+        
+        properties_data = []
+        for property_obj in recent_properties:
+            # Get cover image
+            cover_image = None
+            if property_obj.media:
+                for media in property_obj.media:
+                    if media.media_type == "cover":
+                        cover_image = media.base64_data
+                        break
+            
+            property_data = {
+                "id": str(property_obj.id),
+                "title": property_obj.title,
+                "description": property_obj.description,
+                "property_type": property_obj.property_type,
+                "status": property_obj.status,
+                "price": float(property_obj.price),
+                "bedrooms": property_obj.bedrooms,
+                "bathrooms": property_obj.bathrooms,
+                "area_sqft": float(property_obj.area_sqft) if property_obj.area_sqft else None,
+                "city": property_obj.city,
+                "state": property_obj.state,
+                "address": property_obj.address,
+                "created_at": property_obj.created_at.isoformat() if property_obj.created_at else None,
+                "cover_image": cover_image
+            }
+            properties_data.append(property_data)
+        
+        return JSONResponse(
+            status_code=HTTP_200_OK,
+            content={
+                "success": True,
+                "message": f"Retrieved {len(properties_data)} recent properties",
+                "data": properties_data,
+                "total": len(properties_data)
+            }
+        )
+        
+    except Exception as e:
+        print(f"❌ Error getting recent properties: {str(e)}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get recent properties: {str(e)}"
+        )

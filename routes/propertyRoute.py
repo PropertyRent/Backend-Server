@@ -8,7 +8,9 @@ from controller.propertyController import (
     handle_get_properties_public,
     handle_get_property_by_id,
     handle_get_property_cover_image,
-    handle_get_all_property_cover_images
+    handle_get_all_property_cover_images,
+    get_property_stats,
+    get_recent_properties
 )
 from authMiddleware.authMiddleware import check_for_authentication_cookie
 from authMiddleware.roleMiddleware import require_admin
@@ -311,4 +313,33 @@ async def get_all_property_cover_images():
     Returns all media files where is_cover=True across all properties.
     """
     return await handle_get_all_property_cover_images()
+
+
+@router.get("/admin/properties/stats",
+    summary="[ADMIN] Get property statistics for dashboard",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
+)
+async def get_admin_property_stats():
+    """
+    Get comprehensive property statistics for admin dashboard:
+    - Total properties count
+    - Available properties count  
+    - Rented properties count
+    - Maintenance properties count
+    - Occupancy rate percentage
+    """
+    return await get_property_stats()
+
+
+@router.get("/admin/properties/recent",
+    summary="[ADMIN] Get recent properties",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
+)
+async def get_admin_recent_properties(limit: int = Query(3, ge=1, le=10, description="Number of recent properties to fetch")):
+    """
+    Get recently created properties for admin dashboard.
+    Returns properties ordered by creation date (newest first).
+    Includes basic property info and cover image.
+    """
+    return await get_recent_properties(limit)
 
