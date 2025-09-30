@@ -16,10 +16,15 @@ async def check_for_authentication_cookie(
     """
     token = None
 
- 
+    # Check for HttpOnly token first
     if "token" in request.cookies:
         token = request.cookies.get("token")
+    
+    # Check for non-HttpOnly token if HttpOnly not found
+    if not token and "token_middleware" in request.cookies:
+        token = request.cookies.get("token_middleware")
 
+    # Check Authorization header as fallback
     if not token and credentials:
         if credentials.scheme.lower() == "bearer":
             token = credentials.credentials
