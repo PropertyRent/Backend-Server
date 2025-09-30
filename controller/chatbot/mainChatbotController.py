@@ -9,9 +9,9 @@ from .chatbotEngine import ChatbotFlowEngine
 from .propertySearchController import PropertySearchController
 from .rentInquiryController import RentInquiryController
 from .scheduleVisitController import ScheduleVisitController
-from .generalSupportController import GeneralSupportController
-from .bugReportController import BugReportController
-from .feedbackController import FeedbackController
+from .chatbotScheduleVisitController import ChatbotScheduleVisitController
+from .chatbotBugReportController import ChatbotBugReportController
+from .chatbotFeedbackController import ChatbotFeedbackController
 from .conversationController import ConversationController
 
 
@@ -143,13 +143,11 @@ class MainChatbotController:
                 elif conversation.flow_type == "rent_inquiry":
                     return await RentInquiryController.handle_response(conversation, current_message, user_response)
                 elif conversation.flow_type == "schedule_visit":
-                    return await ScheduleVisitController.handle_response(conversation, current_message, user_response)
-                elif conversation.flow_type == "general_support":
-                    return await GeneralSupportController.handle_response(conversation, current_message, user_response)
+                    return await ChatbotScheduleVisitController.handle_response(conversation, current_message, user_response)
                 elif conversation.flow_type == "bug_report":
-                    return await BugReportController.handle_response(conversation, current_message, user_response)
+                    return await ChatbotBugReportController.handle_response(conversation, current_message, user_response)
                 elif conversation.flow_type == "feedback":
-                    return await FeedbackController.handle_response(conversation, current_message, user_response)
+                    return await ChatbotFeedbackController.handle_response(conversation, current_message, user_response)
                 else:
                     # Default handling - continue with standard flow
                     return await MainChatbotController._handle_standard_flow(conversation, user_response)

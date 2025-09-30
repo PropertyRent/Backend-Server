@@ -97,6 +97,63 @@ async def submit_satisfaction(satisfaction: SatisfactionResponse):
     )
 
 
+# === DEBUG ROUTE FOR TOKEN TESTING ===
+@router.get("/debug/token-test",
+    summary="[DEBUG] Test token authentication (any authenticated user)"
+)
+async def debug_token_test(request: Request, current_user=Depends(check_for_authentication_cookie)):
+    """
+    Debug endpoint to test if token authentication is working.
+    This will help identify token issues before testing admin endpoints.
+    """
+    print(f"🔍 Debug token test - Headers: {dict(request.headers)}")
+    print(f"🔍 Debug token test - Cookies: {request.cookies}")
+    print(f"🔍 Debug token test - Current user: {current_user}")
+    
+    return {
+        "success": True,
+        "message": "Token authentication is working!",
+        "user_id": current_user.get("user_id") if current_user else None,
+        "email": current_user.get("email") if current_user else None,
+        "role": current_user.get("role", "Unknown") if current_user else None,
+        "is_admin": current_user.get("role") == "admin" if current_user else False,
+        "headers_received": dict(request.headers),
+        "cookies_received": dict(request.cookies)
+    }
+
+
+@router.get("/debug/simple-test",
+    summary="[DEBUG] Simple test without authentication"
+)
+async def debug_simple_test():
+    """
+    Simple test endpoint without authentication to verify route is working.
+    """
+    return {
+        "success": True,
+        "message": "Chatbot route is working!",
+        "endpoint": "/api/debug/simple-test"
+    }
+
+
+@router.get("/admin/debug/admin-test",
+    summary="[DEBUG] Test admin role authentication",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
+)
+async def debug_admin_test(current_user=Depends(check_for_authentication_cookie)):
+    """
+    Debug endpoint to test if admin role authentication is working.
+    """
+    return {
+        "success": True,
+        "message": "Admin authentication is working!",
+        "user_id": current_user.get("user_id"),
+        "email": current_user.get("email"),
+        "role": current_user.get("role", "Unknown"),
+        "is_admin": current_user.get("role") == "admin"
+    }
+
+
 # === ADMIN CHATBOT ROUTES ===
 # Authentication required - admin access only
 

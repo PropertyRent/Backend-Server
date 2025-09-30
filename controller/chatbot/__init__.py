@@ -5,9 +5,9 @@ from .conversationController import ConversationController
 from .propertySearchController import PropertySearchController
 from .rentInquiryController import RentInquiryController
 from .scheduleVisitController import ScheduleVisitController
-from .generalSupportController import GeneralSupportController
-from .bugReportController import BugReportController
-from .feedbackController import FeedbackController
+from .chatbotScheduleVisitController import ChatbotScheduleVisitController
+from .chatbotBugReportController import ChatbotBugReportController
+from .chatbotFeedbackController import ChatbotFeedbackController
 
 __all__ = [
     'MainChatbotController',
@@ -16,7 +16,7 @@ __all__ = [
     'PropertySearchController',
     'RentInquiryController',
     'ScheduleVisitController',
-    'GeneralSupportController',
-    'BugReportController',
-    'FeedbackController'
+    'ChatbotScheduleVisitController',
+    'ChatbotBugReportController',
+    'ChatbotFeedbackController'
 ]

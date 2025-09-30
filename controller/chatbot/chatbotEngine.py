@@ -15,7 +15,6 @@ class ChatbotFlowEngine:
                     "Find a property to rent",
                     "Ask about a specific property", 
                     "Schedule a property visit",
-                    "General support",
                     "Report an issue",
                     "Give feedback"
                 ],
@@ -24,7 +23,6 @@ class ChatbotFlowEngine:
                     "Find a property to rent": "property_search",
                     "Ask about a specific property": "rent_inquiry",
                     "Schedule a property visit": "schedule_visit", 
-                    "General support": "general_support",
                     "Report an issue": "bug_report",
                     "Give feedback": "feedback"
                 }
@@ -61,50 +59,38 @@ class ChatbotFlowEngine:
         ],
         
         "schedule_visit": [
-            {"question": "Which property would you like to visit?", "input_type": "text"},
-            {"question": "What's your preferred date?", "input_type": "date"},
-            {"question": "What time works best for you?", 
-             "options": ["Morning (9AM-12PM)", "Afternoon (12PM-4PM)", "Evening (4PM-7PM)"], 
-             "input_type": "choice"},
-            {"question": "What's your full name?", "input_type": "text"},
-            {"question": "What's your contact number?", "input_type": "phone"},
-            {"question": "What's your email address?", "input_type": "email"}
-        ],
-        
-        "general_support": [
-            {"question": "What do you need help with?", 
-             "options": ["Account issues", "Payment problems", "Property inquiry", "Technical support", "Other"], 
-             "input_type": "choice"},
-            {"question": "Can you describe your issue briefly?", "input_type": "text"},
-            {"question": "How urgent is this matter?", 
-             "options": ["Very urgent", "Moderate", "Not urgent"], "input_type": "choice"},
-            {"question": "What's the best way to reach you?", 
-             "options": ["Email", "Phone", "WhatsApp"], "input_type": "choice"}
+            {"question": "Which property would you like to visit?", "input_type": "text"}
+            # Note: This flow uses dynamic questions handled by ChatbotScheduleVisitController
+            # Subsequent questions are generated dynamically based on user responses:
+            # - Property keyword search and selection (dynamic)
+            # - Preferred date selection (dynamic)
+            # - Time selection (dynamic)
+            # - Contact details collection (dynamic)
+            # - ScheduleMeeting record creation (dynamic)
         ],
         
         "bug_report": [
-            {"question": "What type of issue are you experiencing?", 
-             "options": ["Website not loading", "Search not working", "Images not showing", "Form submission error", "Other"], 
-             "input_type": "choice"},
-            {"question": "On which page did this happen?", "input_type": "text"},
-            {"question": "What browser are you using?", 
-             "options": ["Chrome", "Firefox", "Safari", "Edge", "Other"], "input_type": "choice"},
-            {"question": "Can you describe what happened?", "input_type": "text"},
-            {"question": "What's your email for updates?", "input_type": "email"}
+            {"question": "What type of issue would you like to report?", 
+             "options": ["Website bug", "Property not found error", "Search not working", "Other technical issue"], 
+             "input_type": "choice"}
+            # Note: This flow uses dynamic questions handled by ChatbotBugReportController
+            # Subsequent questions are generated dynamically based on issue type:
+            # - Issue category specific questions (dynamic)
+            # - Problem description and details (dynamic)
+            # - Contact information collection (dynamic)
+            # - Issue submission and tracking (dynamic)
         ],
         
         "feedback": [
-            {"question": "What would you like to give feedback about?", 
-             "options": ["Website design", "Property listings", "Customer service", "Overall experience", "Suggestions"], 
-             "input_type": "choice"},
-            {"question": "How would you rate your experience? (1-5)", 
-             "options": ["1 - Very Poor", "2 - Poor", "3 - Average", "4 - Good", "5 - Excellent"], 
-             "input_type": "choice"},
-            {"question": "What did you like most?", "input_type": "text"},
-            {"question": "What can we improve?", "input_type": "text"},
-            {"question": "Would you recommend us to others?", 
-             "options": ["Definitely", "Probably", "Not sure", "Probably not", "Definitely not"], 
+            {"question": "What aspect would you like to give feedback about?", 
+             "options": ["Property search experience", "Website usability", "Property listings quality", "Customer support", "Property visit experience", "Overall service"], 
              "input_type": "choice"}
+            # Note: This flow uses dynamic questions handled by ChatbotFeedbackController  
+            # Subsequent questions are generated dynamically based on feedback category:
+            # - Category specific rating questions (dynamic)
+            # - Detailed feedback collection (dynamic)
+            # - Suggestions and improvements (dynamic)
+            # - Contact information for follow-up (dynamic)
         ]
     }
 
@@ -148,9 +134,8 @@ class ChatbotFlowEngine:
             "find a property to rent": ChatbotFlowType.PROPERTY_SEARCH,
             "ask about a specific property": ChatbotFlowType.RENT_INQUIRY,
             "schedule a property visit": ChatbotFlowType.SCHEDULE_VISIT,
-            "general support": ChatbotFlowType.GENERAL_SUPPORT,
             "report an issue": ChatbotFlowType.BUG_REPORT,
             "give feedback": ChatbotFlowType.FEEDBACK
         }
         
-        return flow_mapping.get(response_lower, ChatbotFlowType.GENERAL_SUPPORT)
+        return flow_mapping.get(response_lower, ChatbotFlowType.BUG_REPORT)
