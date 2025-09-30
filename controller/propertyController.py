@@ -1251,7 +1251,7 @@ async def handle_get_properties_public(
         if status:
             query = Property.filter(status=status)
         else:
-            query = Property.filter(status="available")
+            query = Property.filter()
         
         # === TEXT SEARCH (keyword) ===
         if keyword and keyword.strip():
