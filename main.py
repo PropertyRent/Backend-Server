@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -41,21 +41,32 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=[
-        "Content-Type", 
-        "Authorization", 
-        "Cookie", 
-        "Set-Cookie",
-        "X-Requested-With",
-        "Accept",
-        "Origin",
-        "Access-Control-Request-Method",
-        "Access-Control-Request-Headers",
+        "*",  # Allow all headers for multipart/form-data uploads
     ],
-    expose_headers=["Set-Cookie"],
+    expose_headers=["Set-Cookie", "Content-Type"],
 )
 
 # Session
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("JWT_SECRET", "supersecret"))
+
+# Root endpoint
+@app.get("/")
+async def root():
+    return {"message": "Property Web Backend API", "status": "operational"}
+
+# Test endpoint for CORS debugging
+@app.post("/api/test-cors")
+async def test_cors():
+    return {"message": "CORS test successful", "status": "ok"}
+
+# Manual OPTIONS handler for problematic routes
+@app.options("/{path:path}")
+async def options_handler(path: str, response: Response):
+    response.headers["Access-Control-Allow-Origin"] = "https://satishdev-staging-link.pixbit.me"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return {"message": "OK"}
 
 # Routes
 app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
