@@ -43,7 +43,7 @@ class ChatbotFlowEngine:
             {"question": "When do you want to move in?", 
              "options": ["Immediately", "Within 1 month", "1-3 months", "3+ months"], "input_type": "choice"},
             {"question": "Any specific amenities you need?", 
-             "options": ["Parking", "Gym", "Swimming Pool", "Security", "None specific"], "input_type": "choice"}
+             "options": ["Parking", "Gym", "Swimming Pool", "Security", "None specific"], "input_type": "choice", "is_final": True}
         ],
         
         "rent_inquiry": [
@@ -122,7 +122,7 @@ class ChatbotFlowEngine:
             "options": question_data.get("options"),
             "input_type": question_data["input_type"],
             "step_number": step + 1,
-            "is_final": step == len(flow) - 1
+            "is_final": question_data.get("is_final", step == len(flow) - 1)
         }
 
     @classmethod

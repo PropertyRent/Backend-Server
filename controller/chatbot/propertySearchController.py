@@ -14,6 +14,11 @@ class PropertySearchController:
     async def handle_response(conversation: ChatbotConversation, current_message: ChatbotMessage, user_response: str):
         """Handle property search flow responses"""
         try:
+            # Save user response to current message
+            current_message.user_response = user_response
+            current_message.responded_at = datetime.now(timezone.utc)
+            await current_message.save()
+            
             # Check if this is the end of property search flow
             flow_questions = [
                 "what type of property are you looking for",
@@ -26,21 +31,15 @@ class PropertySearchController:
             ]
             
             current_question = current_message.question_text.lower()
-            
-            # Check if we've completed all questions
             question_step = conversation.current_step
-            
-            if question_step >= len(flow_questions):
-                # End of flow - search for matching properties
-                return await PropertySearchController._search_and_display_properties(conversation)
             
             # Continue with next question
             from .chatbotEngine import ChatbotFlowEngine
             next_question_data = ChatbotFlowEngine.get_next_question(conversation.flow_type, question_step)
             
-            if not next_question_data:
-                # End of flow - search for properties
-                return await PropertySearchController._search_and_display_properties(conversation)
+            if not next_question_data or next_question_data.get("is_final"):
+                # This was the final question - show thank you message with summary
+                return await PropertySearchController._show_completion_message(conversation)
             
             # Create next message
             next_step_number = conversation.current_step + 1
@@ -73,6 +72,72 @@ class PropertySearchController:
             
         except Exception as e:
             print(f"❌ Error in property search flow: {e}")
+            return await ConversationController.handle_satisfaction_question(conversation)
+
+    @staticmethod
+    async def _show_completion_message(conversation: ChatbotConversation):
+        """Show completion message with user's responses summary"""
+        try:
+            # Get all messages with responses for this conversation
+            messages = await ChatbotMessage.filter(
+                conversation=conversation,
+                user_response__not_isnull=True
+            ).order_by('step_number')
+            
+            # Build response summary
+            preferences = {}
+            question_mapping = {
+                "what type of property are you looking for": "Property Type",
+                "which city are you interested in": "City",
+                "what's your budget range per month": "Budget",
+                "how many bedrooms do you need": "Bedrooms",
+                "do you have pets": "Pets",
+                "when do you want to move in": "Move-in Time",
+                "any specific amenities you need": "Amenities"
+            }
+            
+            for message in messages:
+                question_key = message.question_text.lower()
+                for key, display_name in question_mapping.items():
+                    if key in question_key:
+                        preferences[display_name] = message.user_response
+                        break
+            
+            # Create completion message
+            completion_step = conversation.current_step + 1
+            completion_text = "Thank you for providing your property preferences! We have recorded your requirements and our team will contact you soon with suitable options."
+            
+            await ChatbotMessage.create(
+                conversation=conversation,
+                step_number=completion_step,
+                question_text=completion_text,
+                is_bot_message=True
+            )
+            
+            # Mark conversation as completed
+            conversation.status = ConversationStatus.COMPLETED
+            conversation.current_step = completion_step
+            await conversation.save()
+            
+            return JSONResponse(
+                status_code=HTTP_200_OK,
+                content={
+                    "success": True,
+                    "message": "Property search completed",
+                    "data": {
+                        "session_id": conversation.session_id,
+                        "completion_message": completion_text,
+                        "user_preferences": preferences,
+                        "step_number": completion_step,
+                        "is_final": True,
+                        "flow_type": conversation.flow_type,
+                        "status": "completed"
+                    }
+                }
+            )
+            
+        except Exception as e:
+            print(f"❌ Error showing completion message: {e}")
             return await ConversationController.handle_satisfaction_question(conversation)
 
     @staticmethod
