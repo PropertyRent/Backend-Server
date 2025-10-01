@@ -23,7 +23,11 @@ load_dotenv()
 PORT = int(os.getenv("PORT", 8001))
 FRONTEND_URL = os.getenv("FRONTEND_URL")
 
-app = FastAPI()
+app = FastAPI(
+    title="Property Web Backend API",
+    description="A comprehensive FastAPI backend for property management",
+    version="1.0.0"
+)
 
 # CORS
 allowed_origins = [
@@ -46,27 +50,13 @@ app.add_middleware(
     expose_headers=["Set-Cookie", "Content-Type"],
 )
 
+# Form data configuration (equivalent to express.urlencoded)
+# FastAPI handles form data automatically, but we can configure limits
+
 # Session
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("JWT_SECRET", "supersecret"))
 
-# Root endpoint
-@app.get("/")
-async def root():
-    return {"message": "Property Web Backend API", "status": "operational"}
 
-# Test endpoint for CORS debugging
-@app.post("/api/test-cors")
-async def test_cors():
-    return {"message": "CORS test successful", "status": "ok"}
-
-# Manual OPTIONS handler for problematic routes
-@app.options("/{path:path}")
-async def options_handler(path: str, response: Response):
-    response.headers["Access-Control-Allow-Origin"] = "https://satishdev-staging-link.pixbit.me"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    return {"message": "OK"}
 
 # Routes
 app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
@@ -125,8 +115,50 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    return {"message": "Backend API is running"}
+    return {"message": "Property Web Backend API", "status": "operational"}
+
+# Test endpoint for CORS debugging
+@app.post("/api/test-cors")
+async def test_cors():
+    return {"message": "CORS test successful", "status": "ok"}
+
+# Test endpoint for form data (equivalent to express.urlencoded testing)
+from fastapi import Form, File, UploadFile
+from typing import Optional
+
+@app.post("/api/test-form")
+async def test_form_data(
+    title: str = Form(...),
+    description: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None)
+):
+    return {
+        "message": "Form data received successfully",
+        "title": title,
+        "description": description,
+        "file_name": file.filename if file else None,
+        "file_size": file.size if file else None
+    }
+
+# Manual OPTIONS handler for problematic routes
+@app.options("/{path:path}")
+async def options_handler(path: str, response: Response):
+    response.headers["Access-Control-Allow-Origin"] = "https://satishdev-staging-link.pixbit.me"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return {"message": "OK"}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=PORT, reload=True)
+    # Configure uvicorn with larger limits for file uploads (equivalent to express.urlencoded extended handling)
+    uvicorn.run(
+        "main:app", 
+        host="127.0.0.1", 
+        port=PORT, 
+        reload=True,
+        limit_max_requests=1000,
+        timeout_keep_alive=30,
+        # Increase payload size limits for file uploads
+        limit_concurrency=1000
+    )
