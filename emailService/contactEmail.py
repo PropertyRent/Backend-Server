@@ -48,6 +48,65 @@ async def send_contact_notification_to_admin(contact_data: dict):
     return await send_email(ADMIN_EMAIL, subject, html_content)
 
 
+async def send_property_search_notification_to_admin(search_data: dict):
+    """Send notification to admin when user completes property search via chatbot"""
+    subject = f"New Property Search Request from {search_data['email']} - Property-Rent Chatbot"
+    
+    # Build preferences table
+    preferences_html = ""
+    for key, value in search_data['preferences'].items():
+        preferences_html += f"""
+        <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 8px; font-weight: bold; color: #333;">{key}:</td>
+            <td style="padding: 8px; color: #666;">{value}</td>
+        </tr>
+        """
+    
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 30px;">
+      <div style="max-width: 700px; margin: auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="text-align: center; margin-bottom: 25px;">
+          <h2 style="color: #1a39ffff; margin: 0;">🏠 New Property Search Request</h2>
+          <p style="color: #666; margin: 5px 0;">Via Chatbot - Property Search Assistant</p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #1a39ffff; margin-top: 0;">Customer Information</h3>
+          <p><strong>Email:</strong> <a href="mailto:{search_data['email']}" style="color: #1a39ffff;">{search_data['email']}</a></p>
+          <p><strong>Session ID:</strong> {search_data['session_id']}</p>
+          <p><strong>Completed:</strong> {search_data['completed_at']}</p>
+        </div>
+
+        <div style="background-color: #ffffff; border: 2px solid #1a39ffff; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #1a39ffff; margin: 0; padding: 15px; background-color: #f0f4ff; border-radius: 6px 6px 0 0;">Property Requirements</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            {preferences_html}
+          </table>
+        </div>
+
+        <div style="background-color: #e8f4ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h4 style="color: #1a39ffff; margin-top: 0;">📋 Next Steps:</h4>
+          <ul style="color: #333; line-height: 1.6;">
+            <li>Review the customer's property requirements above</li>
+            <li>Search for matching properties in your database</li>
+            <li>Contact the customer at <strong>{search_data['email']}</strong></li>
+            <li>Provide personalized property recommendations</li>
+            <li>Schedule property viewings if interested</li>
+          </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee;">
+          <p style="color: #666; font-size: 14px;">
+            This inquiry was generated automatically by the Property-Rent Chatbot System<br/>
+            Please respond promptly to maintain customer satisfaction
+          </p>
+        </div>
+      </div>
+    </div>
+    """
+    return await send_email(ADMIN_EMAIL, subject, html_content)
+
+
 async def send_admin_reply_to_user(to_email: str, full_name: str, admin_reply: str, original_message: str):
     """Send admin reply to user"""
     subject = "Reply to your inquiry - Property-Rent"

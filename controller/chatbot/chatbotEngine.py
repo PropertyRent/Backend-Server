@@ -43,7 +43,9 @@ class ChatbotFlowEngine:
             {"question": "When do you want to move in?", 
              "options": ["Immediately", "Within 1 month", "1-3 months", "3+ months"], "input_type": "choice"},
             {"question": "Any specific amenities you need?", 
-             "options": ["Parking", "Gym", "Swimming Pool", "Security", "None specific"], "input_type": "choice", "is_final": True}
+             "options": ["Parking", "Gym", "Swimming Pool", "Security", "None specific"], "input_type": "choice"},
+            {"question": "Please provide your email address so our team can contact you with suitable property options:", 
+             "input_type": "email", "is_final": True}
         ],
         
         "rent_inquiry": [

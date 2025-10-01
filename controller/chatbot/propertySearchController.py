@@ -37,8 +37,14 @@ class PropertySearchController:
             from .chatbotEngine import ChatbotFlowEngine
             next_question_data = ChatbotFlowEngine.get_next_question(conversation.flow_type, question_step)
             
-            if not next_question_data or next_question_data.get("is_final"):
-                # This was the final question - show thank you message with summary
+            if not next_question_data:
+                # No more questions - show thank you message with summary
+                return await PropertySearchController._show_completion_message(conversation)
+            
+            # If this is the final question (email), we still need to ask it first
+            # The completion will happen when user responds to the email question
+            if next_question_data.get("is_final") and user_response and current_question == "please provide your email address so our team can contact you with suitable property options":
+                # User has answered the email question - now show completion
                 return await PropertySearchController._show_completion_message(conversation)
             
             # Create next message
@@ -76,7 +82,7 @@ class PropertySearchController:
 
     @staticmethod
     async def _show_completion_message(conversation: ChatbotConversation):
-        """Show completion message with user's responses summary"""
+        """Show completion message with user's responses summary and send email to admin"""
         try:
             # Get all messages with responses for this conversation
             messages = await ChatbotMessage.filter(
@@ -86,6 +92,7 @@ class PropertySearchController:
             
             # Build response summary
             preferences = {}
+            user_email = None
             question_mapping = {
                 "what type of property are you looking for": "Property Type",
                 "which city are you interested in": "City",
@@ -93,19 +100,41 @@ class PropertySearchController:
                 "how many bedrooms do you need": "Bedrooms",
                 "do you have pets": "Pets",
                 "when do you want to move in": "Move-in Time",
-                "any specific amenities you need": "Amenities"
+                "any specific amenities you need": "Amenities",
+                "please provide your email address": "Email"
             }
             
             for message in messages:
                 question_key = message.question_text.lower()
                 for key, display_name in question_mapping.items():
                     if key in question_key:
-                        preferences[display_name] = message.user_response
+                        if display_name == "Email":
+                            user_email = message.user_response
+                        else:
+                            preferences[display_name] = message.user_response
                         break
+            
+            # Send email notification to admin
+            if user_email:
+                try:
+                    from emailService.contactEmail import send_property_search_notification_to_admin
+                    from datetime import datetime, timezone
+                    
+                    search_data = {
+                        "email": user_email,
+                        "session_id": conversation.session_id,
+                        "preferences": preferences,
+                        "completed_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+                    }
+                    
+                    await send_property_search_notification_to_admin(search_data)
+                    print(f"✅ Admin notification sent for property search: {user_email}")
+                except Exception as email_error:
+                    print(f"❌ Failed to send admin notification: {email_error}")
             
             # Create completion message
             completion_step = conversation.current_step + 1
-            completion_text = "Thank you for providing your property preferences! We have recorded your requirements and our team will contact you soon with suitable options."
+            completion_text = "Thank you for providing your property preferences and email! We have recorded your requirements and our team will contact you shortly with suitable property options."
             
             await ChatbotMessage.create(
                 conversation=conversation,
@@ -128,6 +157,7 @@ class PropertySearchController:
                         "session_id": conversation.session_id,
                         "completion_message": completion_text,
                         "user_preferences": preferences,
+                        "user_email": user_email,
                         "step_number": completion_step,
                         "is_final": True,
                         "flow_type": conversation.flow_type,

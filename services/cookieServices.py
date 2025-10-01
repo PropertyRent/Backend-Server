@@ -11,7 +11,7 @@ def set_token_cookie(response: Response, token: str ):
 
     # Set HttpOnly token (existing)
     response.set_cookie(
-        # domain=".pixbit.me",
+        domain=".pixbit.me",
         key="token",
         value=token,
         max_age=max_age,
@@ -23,7 +23,7 @@ def set_token_cookie(response: Response, token: str ):
 
     # Set non-HttpOnly token for JavaScript access
     response.set_cookie(
-        # domain=".pixbit.me",
+        domain=".pixbit.me",
         key="token_middleware",
         value=token,
         max_age=max_age,
@@ -41,7 +41,7 @@ def clear_token_cookie(response: Response):
     """
     # Clear HttpOnly token
     response.delete_cookie(
-        # domain=".pixbit.me",
+        domain=".pixbit.me",
         key="token",
         path="/",
         samesite="none",   
@@ -50,7 +50,7 @@ def clear_token_cookie(response: Response):
     
     # Clear non-HttpOnly token
     response.delete_cookie(
-        # domain=".pixbit.me",
+        domain=".pixbit.me",
         key="token_middleware",
         path="/",
         samesite="none",   
