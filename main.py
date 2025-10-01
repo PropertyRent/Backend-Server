@@ -27,12 +27,10 @@ app = FastAPI(
     title="Property Web Backend API",
     description="A comprehensive FastAPI backend for property management",
     version="1.0.0",
-    # Increase limits for large file uploads
     docs_url="/docs",
     redoc_url="/redoc"
 )
 
-# Custom middleware to handle large requests and ensure CORS headers
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import Response as StarletteResponse
@@ -40,9 +38,8 @@ import asyncio
 
 class LargeRequestCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: StarletteRequest, call_next):
-        # Set higher timeout for large file uploads
         try:
-            response = await asyncio.wait_for(call_next(request), timeout=300.0)  # 5 minutes timeout
+            response = await asyncio.wait_for(call_next(request), timeout=300.0) 
         except asyncio.TimeoutError:
             response = StarletteResponse(
                 content='{"detail": "Request timeout - file too large or processing took too long"}',
@@ -55,8 +52,6 @@ class LargeRequestCORSMiddleware(BaseHTTPMiddleware):
                 status_code=500,
                 headers={"content-type": "application/json"}
             )
-        
-        # Always add CORS headers, even on errors
         origin = request.headers.get("origin")
         if origin in ["https://satishdev-staging-link.pixbit.me", "http://localhost:5173"]:
             response.headers["Access-Control-Allow-Origin"] = origin
@@ -67,7 +62,6 @@ class LargeRequestCORSMiddleware(BaseHTTPMiddleware):
         
         return response
 
-# Add custom middleware first
 app.add_middleware(LargeRequestCORSMiddleware)
 
 # CORS
@@ -77,7 +71,7 @@ allowed_origins = [
     "http://localhost:5173",  # Local development
 ]
 
-# Remove None values if FRONTEND_URL is not set
+
 allowed_origins = [origin for origin in allowed_origins if origin is not None]
 
 app.add_middleware(
@@ -91,8 +85,6 @@ app.add_middleware(
     expose_headers=["Set-Cookie", "Content-Type"],
 )
 
-# Form data configuration (equivalent to express.urlencoded)
-# FastAPI handles form data automatically, but we can configure limits
 
 # Session
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("JWT_SECRET", "supersecret"))
@@ -132,7 +124,7 @@ app.include_router(
 app.include_router(screening_router, prefix="/api", tags=["Screening Questions"])  # Both public and admin routes
 
 # Meeting scheduling routes - public scheduling, authenticated user management, admin approval
-app.include_router(meeting_router, prefix="/api", tags=["Schedule Meetings"])  # Mixed access levels
+app.include_router(meeting_router, prefix="/api", tags=["Schedule Meetings"])  
 
 # Notice routes - admin only for CRUD operations
 app.include_router(
@@ -154,16 +146,7 @@ init_db(app)
 async def startup_event():
     print(f"Server running on port {PORT}")
 
-@app.get("/")
-async def root():
-    return {"message": "Property Web Backend API", "status": "operational"}
 
-# Test endpoint for CORS debugging
-@app.post("/api/test-cors")
-async def test_cors():
-    return {"message": "CORS test successful", "status": "ok"}
-
-# Test endpoint for form data (equivalent to express.urlencoded testing)
 from fastapi import Form, File, UploadFile
 from typing import Optional, List
 
@@ -200,7 +183,6 @@ async def test_multiple_files(
                 "size": size,
                 "content_type": file.content_type
             })
-            # Reset file pointer
             await file.seek(0)
     
     return {
@@ -210,7 +192,6 @@ async def test_multiple_files(
         "total_size": total_size
     }
 
-# Manual OPTIONS handler for problematic routes
 @app.options("/{path:path}")
 async def options_handler(path: str, response: Response):
     response.headers["Access-Control-Allow-Origin"] = "https://satishdev-staging-link.pixbit.me"
@@ -221,17 +202,15 @@ async def options_handler(path: str, response: Response):
 
 if __name__ == "__main__":
     import uvicorn
-    # Configure uvicorn with larger limits for multiple file uploads
     uvicorn.run(
         "main:app", 
         host="127.0.0.1", 
         port=PORT, 
         reload=True,
-        timeout_keep_alive=60,  # Increased timeout for large uploads
+        timeout_keep_alive=60,  
         timeout_graceful_shutdown=60,
         limit_concurrency=1000,
         limit_max_requests=1000,
-        # Additional configurations for large payloads
         access_log=True,
         use_colors=True
     )
