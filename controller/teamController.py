@@ -11,6 +11,7 @@ from starlette.status import (
 )
 from tortoise.exceptions import DoesNotExist, IntegrityError
 from tortoise.transactions import in_transaction
+from tortoise.expressions import Q
 
 from model.teamModel import Team
 from schemas.teamSchemas import TeamCreate, TeamUpdate, TeamResponse
@@ -78,7 +79,8 @@ async def get_all_team_members(
         if position:
             query = query.filter(position_name__icontains=position)
         if search:
-            query = query.filter(name__icontains=search) | query.filter(email__icontains=search)
+            # Use Q objects for OR condition
+            query = query.filter(Q(name__icontains=search) | Q(email__icontains=search))
         
         # Get total count
         total = await query.count()
