@@ -104,11 +104,12 @@ app.include_router(
     prefix="/api",
     tags=["Properties"],
 )
+# Team routes - public GET, admin management for CUD operations
 app.include_router(
     team_router,
     prefix="/api",
     tags=["Team"],
-    dependencies=[Depends(authorize_roles(["admin"]))],  # Only admins can manage team
+    # No dependencies here - route-level auth will be handled individually
 )
 
 # Contact routes - public contact form, admin management
@@ -126,12 +127,12 @@ app.include_router(screening_router, prefix="/api", tags=["Screening Questions"]
 # Meeting scheduling routes - public scheduling, authenticated user management, admin approval
 app.include_router(meeting_router, prefix="/api", tags=["Schedule Meetings"])  
 
-# Notice routes - admin only for CRUD operations
+# Notice routes - public active notices, admin management for other operations
 app.include_router(
     notice_router,
     prefix="/api",
     tags=["Notices"],
-    dependencies=[Depends(authorize_roles(["admin"]))],  # Only admins can manage notices
+    # No dependencies here - route-level auth will be handled individually
 )
 
 # Property recommendation routes - mixed access (public recommendations, admin management)

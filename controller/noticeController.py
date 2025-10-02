@@ -447,3 +447,72 @@ async def handle_update_notice(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update notice: {str(e)}"
         )
+
+
+async def get_active_notices(
+    limit: int = 10,
+    offset: int = 0,
+    search: Optional[str] = None
+):
+    """Get all active notices with optional filtering and pagination"""
+    try:
+        print(f"📢 Getting active notices - limit: {limit}, offset: {offset}, search: {search}")
+        
+        # Build query for active notices
+        query = Notice.filter(is_active=True)
+        
+        # Add search filter if provided
+        if search:
+            query = query.filter(
+                title__icontains=search
+            ).union(
+                Notice.filter(is_active=True, description__icontains=search)
+            )
+        
+        # Get total count for pagination
+        total = await query.count()
+        
+        # Get notices with pagination, ordered by creation date (newest first)
+        notices = await query.order_by('-created_at').offset(offset).limit(limit)
+        
+        # Format notices data
+        notices_data = []
+        for notice in notices:
+            notice_data = {
+                "id": str(notice.id),
+                "title": notice.title,
+                "description": notice.description,
+                "notice_file": notice.notice_file,
+                "file_type": notice.file_type,
+                "original_filename": notice.original_filename,
+                "is_active": notice.is_active,
+                "created_at": notice.created_at.isoformat(),
+                "updated_at": notice.updated_at.isoformat()
+            }
+            notices_data.append(notice_data)
+        
+        print(f"✅ Found {len(notices_data)} active notices out of {total} total active")
+        
+        return JSONResponse(
+            status_code=HTTP_200_OK,
+            content={
+                "success": True,
+                "message": f"Active notices retrieved successfully",
+                "data": {
+                    "notices": notices_data,
+                    "pagination": {
+                        "total": total,
+                        "limit": limit,
+                        "offset": offset,
+                        "returned": len(notices_data)
+                    }
+                }
+            }
+        )
+        
+    except Exception as e:
+        print(f"❌ Failed to get active notices: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve active notices: {str(e)}"
+        )

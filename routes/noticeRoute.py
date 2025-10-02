@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Query, UploadFile, File, Form
+from fastapi import APIRouter, Query, UploadFile, File, Form, Depends
 from typing import Optional
 from controller.noticeController import (
     handle_create_notice,
     handle_update_notice,
     delete_notice,
     get_all_notices,
-    get_notice_by_id
+    get_notice_by_id,
+    get_active_notices
 )
+from authMiddleware.authMiddleware import check_for_authentication_cookie
+from authMiddleware.roleMiddleware import require_admin
 
 router = APIRouter(tags=["Notices"])
 
@@ -15,7 +18,8 @@ router = APIRouter(tags=["Notices"])
 # Single routes that handle both JSON data and file uploads
 
 @router.post("/notices", 
-    summary="Create notice with optional file upload"
+    summary="[ADMIN] Create notice with optional file upload",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
 async def create_notice(
     title: str = Form(...),
@@ -40,7 +44,8 @@ async def create_notice(
 
 
 @router.put("/notices/{notice_id}",
-    summary="Update notice with optional file upload"
+    summary="[ADMIN] Update notice with optional file upload",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
 async def update_notice(
     notice_id: str,
@@ -71,7 +76,8 @@ async def update_notice(
 # === NOTICE MANAGEMENT OPERATIONS ===
 
 @router.delete("/notices/{notice_id}", 
-    summary="Delete a notice"
+    summary="[ADMIN] Delete a notice",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
 async def delete_notice_route(notice_id: str):
     """Delete a notice by ID"""
@@ -79,7 +85,8 @@ async def delete_notice_route(notice_id: str):
 
 
 @router.get("/notices", 
-    summary="Get all notices with filtering and pagination"
+    summary="[ADMIN] Get all notices with filtering and pagination",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
 async def get_all_notices_route(
     limit: int = Query(10, ge=1, le=100, description="Number of notices to return"),
@@ -103,14 +110,45 @@ async def get_all_notices_route(
 
 
 @router.get("/notices/{notice_id}", 
-    summary="Get a notice by ID"
+    summary="[ADMIN] Get a notice by ID",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
 async def get_notice_by_id_route(notice_id: str):
     """
     Get a single notice by ID.
+    
+    **ADMIN ONLY** - Requires authentication and admin role.
     
     - **notice_id**: UUID of the notice to retrieve
     
     Returns complete notice details including file attachment if present.
     """
     return await get_notice_by_id(notice_id)
+
+
+# === PUBLIC NOTICE ROUTES ===
+
+@router.get("/notices/active", 
+    summary="[PUBLIC] Get active notices only"
+)
+async def get_active_notices_route(
+    limit: int = Query(10, ge=1, le=100, description="Number of active notices to return"),
+    offset: int = Query(0, ge=0, description="Number of notices to skip"),
+    search: Optional[str] = Query(None, description="Search by title or description")
+):
+    """
+    Get active notices with optional filtering and pagination.
+    
+    **PUBLIC ROUTE** - No authentication required.
+    
+    - **limit**: Number of active notices to return (1-100, default: 10)
+    - **offset**: Number of notices to skip for pagination (default: 0)
+    - **search**: Search term to filter notices by title or description (optional)
+    
+    Returns only notices that are marked as active, ordered by creation date (newest first).
+    """
+    return await get_active_notices(
+        limit=limit,
+        offset=offset,
+        search=search
+    )

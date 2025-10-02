@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, UploadFile, File, Form
+from fastapi import APIRouter, Query, UploadFile, File, Form, Depends
 from typing import Optional
 from controller.teamController import (
     handle_create_team_member,
@@ -7,6 +7,8 @@ from controller.teamController import (
     get_all_team_members,
     get_team_member_by_id
 )
+from authMiddleware.authMiddleware import check_for_authentication_cookie
+from authMiddleware.roleMiddleware import require_admin
 
 router = APIRouter(tags=["Team"])
 
@@ -15,7 +17,8 @@ router = APIRouter(tags=["Team"])
 # Single routes that handle both JSON data and file uploads
 
 @router.post("/team", 
-    summary="Create team member with optional photo upload"
+    summary="[ADMIN] Create team member with optional photo upload",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
 async def create_team_member(
     name: str = Form(...),
@@ -51,7 +54,8 @@ async def create_team_member(
 
 
 @router.put("/team/{member_id}",
-    summary="Update team member with optional photo upload"
+    summary="[ADMIN] Update team member with optional photo upload",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
 async def update_team_member(
     member_id: str,
@@ -93,7 +97,8 @@ async def update_team_member(
 # === TEAM MANAGEMENT OPERATIONS ===
 
 @router.delete("/team/{member_id}", 
-    summary="Delete a team member"
+    summary="[ADMIN] Delete a team member",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
 async def delete_team_member_route(member_id: str):
     """Delete a team member by ID"""
@@ -101,7 +106,7 @@ async def delete_team_member_route(member_id: str):
 
 
 @router.get("/team", 
-    summary="Get all team members with filtering and pagination"
+    summary="[PUBLIC] Get all team members with filtering and pagination"
 )
 async def get_all_team_members_route(
     limit: int = Query(10, ge=1, le=100, description="Number of team members to return"),
@@ -109,7 +114,18 @@ async def get_all_team_members_route(
     position: Optional[str] = Query(None, description="Filter by position"),
     search: Optional[str] = Query(None, description="Search by name or email")
 ):
-    """Get all team members with optional filtering and pagination"""
+    """
+    Get all team members with optional filtering and pagination.
+    
+    **PUBLIC ROUTE** - No authentication required.
+    
+    - **limit**: Number of team members to return (1-100, default: 10)
+    - **offset**: Number of team members to skip for pagination (default: 0)
+    - **position**: Filter by job position/title (optional)
+    - **search**: Search by name or email (optional)
+    
+    Returns team member information including name, position, description, and photo.
+    """
     return await get_all_team_members(
         limit=limit,
         offset=offset,
@@ -119,8 +135,16 @@ async def get_all_team_members_route(
 
 
 @router.get("/team/{member_id}", 
-    summary="Get a team member by ID"
+    summary="[PUBLIC] Get a team member by ID"
 )
 async def get_team_member_by_id_route(member_id: str):
-    """Get a single team member by ID"""
+    """
+    Get a single team member by ID.
+    
+    **PUBLIC ROUTE** - No authentication required.
+    
+    - **member_id**: UUID of the team member to retrieve
+    
+    Returns detailed team member information including all fields and photo.
+    """
     return await get_team_member_by_id(member_id)

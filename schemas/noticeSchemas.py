@@ -7,6 +7,7 @@ from pydantic import BaseModel
 class NoticeBase(BaseModel):
     title: str
     description: Optional[str] = None
+    is_active: Optional[bool] = True
 
 
 class NoticeCreate(NoticeBase):
@@ -20,6 +21,7 @@ class NoticeUpdate(BaseModel):
     """Schema for updating a notice"""
     title: Optional[str] = None
     description: Optional[str] = None
+    is_active: Optional[bool] = None
     notice_file: Optional[str] = None
     file_type: Optional[str] = None
     original_filename: Optional[str] = None
@@ -31,6 +33,7 @@ class NoticeResponse(NoticeBase):
     notice_file: Optional[str] = None
     file_type: Optional[str] = None
     original_filename: Optional[str] = None
+    is_active: bool
     created_at: datetime
     updated_at: datetime
 
