@@ -76,7 +76,7 @@ async def send_meeting_approval_email(to_email: str, meeting_data: dict):
           <p><strong>Status:</strong> <span style="color: #28a745;">Approved</span></p>
         </div>
         
-        {f'<div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;"><h4>Additional Notes from Admin:</h4><p>{admin_notes}</p></div>' if admin_notes else ''}
+        {f'<div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;"><h4>Message from Admin:</h4><p>{meeting_data.get("admin_reply", admin_notes)}</p></div>' if meeting_data.get("admin_reply") or admin_notes else ''}
         
         <p><strong>What to bring:</strong></p>
         <ul>
@@ -132,7 +132,7 @@ async def send_meeting_rejection_email(to_email: str, meeting_data: dict):
         
         <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h4>Message from our team:</h4>
-          <p>{admin_notes}</p>
+          <p>{meeting_data.get("admin_reply", admin_notes)}</p>
         </div>
         
         <p>We encourage you to:</p>

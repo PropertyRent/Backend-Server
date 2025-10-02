@@ -42,8 +42,14 @@ class ScheduleMeetingCreate(BaseModel):
 class ScheduleMeetingUpdate(BaseModel):
     status: Optional[MeetingStatusEnum] = None
     admin_notes: Optional[str] = None
+    admin_reply: Optional[str] = None  # Admin reply message
     meeting_date: Optional[date] = None
     meeting_time: Optional[time] = None
+
+class AdminReplySchema(BaseModel):
+    """Schema for admin reply to meeting"""
+    admin_reply: str
+    action: MeetingStatusEnum  # approve or reject
 
 class ScheduleMeetingResponse(BaseModel):
     id: str
@@ -57,6 +63,8 @@ class ScheduleMeetingResponse(BaseModel):
     message: Optional[str] = None
     status: str
     admin_notes: Optional[str] = None
+    admin_reply: Optional[str] = None
+    admin_reply_date: Optional[datetime] = None
     approved_by: Optional[str] = None
     approved_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -76,6 +84,8 @@ class ScheduleMeetingWithProperty(BaseModel):
     message: Optional[str] = None
     status: str
     admin_notes: Optional[str] = None
+    admin_reply: Optional[str] = None
+    admin_reply_date: Optional[datetime] = None
     approved_by: Optional[str] = None
     approved_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

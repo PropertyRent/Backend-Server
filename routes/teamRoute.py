@@ -16,7 +16,7 @@ router = APIRouter(tags=["Team"])
 # === UNIFIED TEAM CRUD OPERATIONS ===
 # Single routes that handle both JSON data and file uploads
 
-@router.post("/team", 
+@router.post("/admin/team/add", 
     summary="[ADMIN] Create team member with optional photo upload",
     dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
@@ -53,7 +53,7 @@ async def create_team_member(
     )
 
 
-@router.put("/team/{member_id}",
+@router.put("/admin/team/{member_id}",
     summary="[ADMIN] Update team member with optional photo upload",
     dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
@@ -96,7 +96,7 @@ async def update_team_member(
 
 # === TEAM MANAGEMENT OPERATIONS ===
 
-@router.delete("/team/{member_id}", 
+@router.delete("/admin/team/{member_id}", 
     summary="[ADMIN] Delete a team member",
     dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
@@ -105,7 +105,7 @@ async def delete_team_member_route(member_id: str):
     return await delete_team_member(member_id)
 
 
-@router.get("/team", 
+@router.get("/public/team", 
     summary="[PUBLIC] Get all team members with filtering and pagination"
 )
 async def get_all_team_members_route(
@@ -134,7 +134,7 @@ async def get_all_team_members_route(
     )
 
 
-@router.get("/team/{member_id}", 
+@router.get("/public/team/{member_id}", 
     summary="[PUBLIC] Get a team member by ID"
 )
 async def get_team_member_by_id_route(member_id: str):

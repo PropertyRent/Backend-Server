@@ -27,8 +27,8 @@ from authMiddleware.authMiddleware import check_for_authentication_cookie
 
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@propertyrent.com")
 
-async def handle_schedule_meeting(request: Request, meeting_data: ScheduleMeetingCreate):
-    """Handle meeting scheduling by users"""
+async def handle_schedule_meeting(request: Optional[Request], meeting_data: ScheduleMeetingCreate):
+    """Handle meeting scheduling by users - No login required"""
     try:
         # Verify property exists
         try:
@@ -36,15 +36,8 @@ async def handle_schedule_meeting(request: Request, meeting_data: ScheduleMeetin
         except DoesNotExist:
             raise HTTPException(status_code=404, detail="Property not found")
         
-        # Get current user if logged in (optional)
+        # Since no login is required, user will always be None
         current_user = None
-        try:
-            user_payload = await check_for_authentication_cookie(request)
-            user_id = user_payload.get("id")
-            if user_id:
-                current_user = await User.get(id=uuid.UUID(user_id))
-        except:
-            pass  # User not logged in, proceed as guest
         
         # Create meeting request
         meeting = await ScheduleMeeting.create(
@@ -397,3 +390,65 @@ async def handle_cancel_meeting(request: Request, meeting_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to cancel meeting: {str(e)}")
+
+
+async def handle_admin_reply_to_meeting(request: Request, meeting_id: str, reply_data):
+    """Handle admin reply to meeting request with approve/reject"""
+    try:
+        # Get current admin user
+        user_payload = await check_for_authentication_cookie(request)
+        admin_user_id = user_payload.get("id")
+        admin_user = await User.get(id=uuid.UUID(admin_user_id))
+        
+        # Get meeting
+        try:
+            meeting = await ScheduleMeeting.get(id=uuid.UUID(meeting_id)).prefetch_related('property')
+        except DoesNotExist:
+            raise HTTPException(status_code=404, detail="Meeting not found")
+        
+        # Update meeting with admin reply
+        meeting.admin_reply = reply_data.admin_reply
+        meeting.admin_reply_date = datetime.now()
+        meeting.status = reply_data.action  # approved or rejected
+        
+        if reply_data.action == MeetingStatus.APPROVED:
+            meeting.approved_by_id = admin_user.id
+            meeting.approved_at = datetime.now()
+        
+        await meeting.save()
+        
+        # Prepare email data
+        email_data = {
+            'full_name': meeting.full_name,
+            'meeting_date': meeting.meeting_date.strftime('%B %d, %Y'),
+            'meeting_time': meeting.meeting_time.strftime('%I:%M %p'),
+            'property_title': meeting.property.title,
+            'admin_reply': meeting.admin_reply,
+            'admin_name': admin_user.full_name if hasattr(admin_user, 'full_name') else admin_user.email
+        }
+        
+        # Send appropriate email based on action
+        if reply_data.action == MeetingStatus.APPROVED:
+            await send_meeting_approval_email(meeting.email, email_data)
+            message = "Meeting approved and confirmation email sent to user"
+        elif reply_data.action == MeetingStatus.REJECTED:
+            await send_meeting_rejection_email(meeting.email, email_data)
+            message = "Meeting rejected and notification email sent to user"
+        else:
+            message = "Meeting updated successfully"
+        
+        return {
+            "success": True,
+            "message": message,
+            "data": {
+                "meeting_id": str(meeting.id),
+                "status": meeting.status.value,
+                "admin_reply": meeting.admin_reply,
+                "admin_reply_date": meeting.admin_reply_date.isoformat()
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process admin reply: {str(e)}")

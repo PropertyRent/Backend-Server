@@ -3,60 +3,29 @@ from typing import Optional
 
 from controller.scheduleMeetingController import (
     handle_schedule_meeting,
-    handle_get_user_meetings,
     handle_get_all_meetings_admin,
     handle_update_meeting_status,
-    handle_get_meeting_by_id,
     handle_delete_meeting,
-    handle_get_meeting_stats,
-    handle_cancel_meeting
+    handle_get_meeting_stats
 )
 from schemas.scheduleMeetingSchemas import (
     ScheduleMeetingCreate,
-    ScheduleMeetingUpdate
+    ScheduleMeetingUpdate,
+    AdminReplySchema
 )
 from authMiddleware.authMiddleware import check_for_authentication_cookie
 from authMiddleware.roleMiddleware import require_admin
 
 router = APIRouter(tags=["Schedule Meetings"])
 
-# Public/User routes
+# Public routes - No login required
 @router.post("/meetings/schedule", 
-    summary="Schedule a meeting for property viewing",
-    description="Allow users (logged in or guest) to schedule a meeting to view a property"
+    summary="[PUBLIC] Schedule a meeting for property viewing",
+    description="Allow users (no login required) to schedule a meeting to view a property"
 )
-async def schedule_meeting(request: Request, meeting_data: ScheduleMeetingCreate):
-    """Schedule a meeting for property viewing"""
-    return await handle_schedule_meeting(request, meeting_data)
-
-@router.get("/user/meetings",
-    summary="Get user's scheduled meetings",
-    description="Get all meetings scheduled by the current logged-in user",
-    dependencies=[Depends(check_for_authentication_cookie)]
-)
-async def get_user_meetings(
-    request: Request,
-    status: Optional[str] = Query(None, description="Filter by meeting status (pending, approved, rejected, completed, cancelled)")
-):
-    """Get meetings for the current user"""
-    return await handle_get_user_meetings(request, status)
-
-@router.put("/user/meetings/{meeting_id}/cancel",
-    summary="Cancel user's meeting",
-    description="Allow user to cancel their own meeting",
-    dependencies=[Depends(check_for_authentication_cookie)]
-)
-async def cancel_user_meeting(request: Request, meeting_id: str):
-    """Cancel user's own meeting"""
-    return await handle_cancel_meeting(request, meeting_id)
-
-@router.get("/meetings/{meeting_id}",
-    summary="Get meeting details",
-    description="Get detailed information about a specific meeting"
-)
-async def get_meeting_by_id(meeting_id: str):
-    """Get meeting details by ID"""
-    return await handle_get_meeting_by_id(meeting_id)
+async def schedule_meeting(meeting_data: ScheduleMeetingCreate):
+    """Schedule a meeting for property viewing - No login required"""
+    return await handle_schedule_meeting(None, meeting_data)
 
 # Admin routes
 @router.get("/admin/meetings",
@@ -128,3 +97,13 @@ async def complete_meeting(request: Request, meeting_id: str, admin_notes: Optio
     """Mark meeting as completed"""
     update_data = ScheduleMeetingUpdate(status="completed", admin_notes=admin_notes)
     return await handle_update_meeting_status(request, meeting_id, update_data)
+
+@router.post("/admin/meetings/{meeting_id}/reply",
+    summary="[ADMIN] Reply to meeting request",
+    description="Admin can reply to meeting request and approve/reject with message",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
+)
+async def reply_to_meeting(request: Request, meeting_id: str, reply_data: AdminReplySchema):
+    """Admin reply to meeting request with approve/reject"""
+    from controller.scheduleMeetingController import handle_admin_reply_to_meeting
+    return await handle_admin_reply_to_meeting(request, meeting_id, reply_data)

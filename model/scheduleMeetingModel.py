@@ -31,6 +31,8 @@ class ScheduleMeeting(models.Model):
     
     # Admin fields
     admin_notes = fields.TextField(null=True)
+    admin_reply = fields.TextField(null=True, default=None)  # Admin reply message to user
+    admin_reply_date = fields.DatetimeField(null=True, default=None)  # When admin replied
     approved_by = fields.ForeignKeyField("models.User", related_name="approved_meetings", null=True, on_delete=fields.SET_NULL)
     approved_at = fields.DatetimeField(null=True)
     completed_at = fields.DatetimeField(null=True)

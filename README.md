@@ -4,7 +4,21 @@ A comprehensive FastAPI-based backend application for property management and re
 
 ## Project Overview
 
-This backend service provides a robust foundation for property rental and management platforms, offering:
+This backend service provides a robust foundation for property rental and#### Meeting & Scheduling
+```
+# Public Routes (No Authentication Required)
+POST /api/meetings/schedule           - Schedule property visit (no login required)
+
+# Admin Routes (Authentication + Admin Role Required)
+GET    /api/admin/meetings            - Get all scheduled meetings with filtering
+PUT    /api/admin/meetings/{id}       - Update meeting status/details
+DELETE /api/admin/meetings/{id}       - Delete meeting
+GET    /api/admin/meetings/stats      - Get meeting statistics
+PUT    /api/admin/meetings/{id}/approve  - Approve meeting with optional notes
+PUT    /api/admin/meetings/{id}/reject   - Reject meeting with optional notes  
+PUT    /api/admin/meetings/{id}/complete - Mark meeting as completed
+POST   /api/admin/meetings/{id}/reply    - Reply to meeting with approve/reject action
+```platforms, offering:
 - **Admin Property Management**: Complete property CRUD with integrated statistics and analytics
 - **Intelligent Chatbot**: Multi-flow conversation engine for property search, inquiries, and support
 - **Property Recommendations**: AI-powered property suggestion system
