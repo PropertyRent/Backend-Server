@@ -255,3 +255,82 @@ async def notify_admin_new_meeting(admin_email: str, meeting_data: dict):
     </div>
     """
     return await send_email(admin_email, subject, html_content)
+
+
+async def send_admin_reply_email(to_email: str, meeting_data: dict):
+    """Send admin reply to user when admin sends a message without changing status"""
+    subject = "Message from Admin - Property-Rent"
+    
+    meeting_date = meeting_data.get('meeting_date')
+    meeting_time = meeting_data.get('meeting_time')
+    property_title = meeting_data.get('property_title', 'Property')
+    full_name = meeting_data.get('full_name')
+    admin_message = meeting_data.get('admin_message', '')
+    admin_name = meeting_data.get('admin_name', 'Admin')
+    
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 30px;">
+      <div style="max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 8px;">
+        <h2 style="color: #007bff;">Message from Property Admin</h2>
+        <p>Dear {full_name},</p>
+        <p>You have received a message from our admin regarding your meeting request:</p>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin: 20px 0;">
+          <h3>Meeting Details:</h3>
+          <p><strong>Property:</strong> {property_title}</p>
+          <p><strong>Date:</strong> {meeting_date}</p>
+          <p><strong>Time:</strong> {meeting_time}</p>
+        </div>
+        
+        <div style="background-color: #e3f2fd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <h4 style="color: #1976d2;">Admin Message:</h4>
+          <p style="font-style: italic;">"{admin_message}"</p>
+          <p style="text-align: right; margin-top: 10px; color: #666;">- {admin_name}</p>
+        </div>
+        
+        <p>If you have any questions or need to make changes to your meeting, please feel free to contact us.</p>
+        
+        <p style="margin-top: 20px;">Best regards,<br>Property-Rent Team</p>
+      </div>
+    </div>
+    """
+    return await send_email(to_email, subject, html_content)
+
+
+async def send_meeting_cancellation_email(to_email: str, meeting_data: dict):
+    """Send cancellation email to user when admin deletes a meeting"""
+    subject = "Meeting Cancelled - Property-Rent"
+    
+    meeting_date = meeting_data.get('meeting_date')
+    meeting_time = meeting_data.get('meeting_time')
+    property_title = meeting_data.get('property_title', 'Property')
+    full_name = meeting_data.get('full_name')
+    admin_name = meeting_data.get('admin_name', 'Admin')
+    
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 30px;">
+      <div style="max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 8px;">
+        <h2 style="color: #dc3545;">Meeting Cancelled</h2>
+        <p>Dear {full_name},</p>
+        <p>We regret to inform you that your meeting request has been cancelled by our admin team.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #dc3545; margin: 20px 0;">
+          <h3>Cancelled Meeting Details:</h3>
+          <p><strong>Property:</strong> {property_title}</p>
+          <p><strong>Date:</strong> {meeting_date}</p>
+          <p><strong>Time:</strong> {meeting_time}</p>
+        </div>
+        
+        <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+          <h4 style="color: #856404;">What's Next?</h4>
+          <p>You can schedule a new meeting at any time through our website.</p>
+          <p>If you have any questions about this cancellation, please don't hesitate to contact us.</p>
+        </div>
+        
+        <p>We apologize for any inconvenience caused and appreciate your understanding.</p>
+        
+        <p style="margin-top: 20px;">Best regards,<br>Property-Rent Team<br><small>Cancelled by: {admin_name}</small></p>
+      </div>
+    </div>
+    """
+    return await send_email(to_email, subject, html_content)

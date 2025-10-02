@@ -4,13 +4,13 @@ from typing import Optional
 from controller.scheduleMeetingController import (
     handle_schedule_meeting,
     handle_get_all_meetings_admin,
-    handle_update_meeting_status,
-    handle_delete_meeting,
-    handle_get_meeting_stats
+    handle_get_meeting_by_id,
+    handle_admin_reply_to_meeting,
+    handle_admin_complete_meeting,
+    handle_admin_delete_meeting
 )
 from schemas.scheduleMeetingSchemas import (
     ScheduleMeetingCreate,
-    ScheduleMeetingUpdate,
     AdminReplySchema
 )
 from authMiddleware.authMiddleware import check_for_authentication_cookie
@@ -18,7 +18,7 @@ from authMiddleware.roleMiddleware import require_admin
 
 router = APIRouter(tags=["Schedule Meetings"])
 
-# Public routes - No login required
+# === PUBLIC ROUTES - No login required ===
 @router.post("/meetings/schedule", 
     summary="[PUBLIC] Schedule a meeting for property viewing",
     description="Allow users (no login required) to schedule a meeting to view a property"
@@ -27,9 +27,10 @@ async def schedule_meeting(meeting_data: ScheduleMeetingCreate):
     """Schedule a meeting for property viewing - No login required"""
     return await handle_schedule_meeting(None, meeting_data)
 
-# Admin routes
+# === ADMIN ROUTES - Authentication + Admin Role Required ===
+
 @router.get("/admin/meetings",
-    summary="[ADMIN] Get all meetings",
+    summary="[ADMIN] Get all meetings scheduled by users",
     description="Get all meetings for admin review and management",
     dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
@@ -37,73 +38,42 @@ async def get_all_meetings_admin(
     status: Optional[str] = Query(None, description="Filter by meeting status"),
     property_id: Optional[str] = Query(None, description="Filter by property ID")
 ):
-    """Get all meetings for admin"""
+    """1) Admin get all meetings scheduled by users"""
     return await handle_get_all_meetings_admin(status, property_id)
 
-@router.put("/admin/meetings/{meeting_id}",
-    summary="[ADMIN] Update meeting status",
-    description="Update meeting status, add admin notes, approve/reject meetings",
+@router.get("/admin/meetings/{meeting_id}",
+    summary="[ADMIN] Get meeting by ID",
+    description="Get detailed information about a specific meeting",
     dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
-async def update_meeting_status(request: Request, meeting_id: str, update_data: ScheduleMeetingUpdate):
-    """Update meeting status (admin only)"""
-    return await handle_update_meeting_status(request, meeting_id, update_data)
-
-@router.delete("/admin/meetings/{meeting_id}",
-    summary="[ADMIN] Delete meeting",
-    description="Delete a meeting request",
-    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
-)
-async def delete_meeting(meeting_id: str):
-    """Delete meeting (admin only)"""
-    return await handle_delete_meeting(meeting_id)
-
-@router.get("/admin/meetings/stats",
-    summary="[ADMIN] Get meeting statistics",
-    description="Get meeting statistics for admin dashboard",
-    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
-)
-async def get_meeting_stats():
-    """Get meeting statistics"""
-    return await handle_get_meeting_stats()
-
-# Specific admin actions
-@router.put("/admin/meetings/{meeting_id}/approve",
-    summary="[ADMIN] Approve meeting",
-    description="Approve a pending meeting request",
-    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
-)
-async def approve_meeting(request: Request, meeting_id: str, admin_notes: Optional[str] = None):
-    """Approve a meeting"""
-    update_data = ScheduleMeetingUpdate(status="approved", admin_notes=admin_notes)
-    return await handle_update_meeting_status(request, meeting_id, update_data)
-
-@router.put("/admin/meetings/{meeting_id}/reject",
-    summary="[ADMIN] Reject meeting",
-    description="Reject a pending meeting request",
-    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
-)
-async def reject_meeting(request: Request, meeting_id: str, admin_notes: Optional[str] = None):
-    """Reject a meeting"""
-    update_data = ScheduleMeetingUpdate(status="rejected", admin_notes=admin_notes)
-    return await handle_update_meeting_status(request, meeting_id, update_data)
-
-@router.put("/admin/meetings/{meeting_id}/complete",
-    summary="[ADMIN] Mark meeting as completed",
-    description="Mark a meeting as completed after it has taken place",
-    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
-)
-async def complete_meeting(request: Request, meeting_id: str, admin_notes: Optional[str] = None):
-    """Mark meeting as completed"""
-    update_data = ScheduleMeetingUpdate(status="completed", admin_notes=admin_notes)
-    return await handle_update_meeting_status(request, meeting_id, update_data)
+async def get_meeting_by_id_admin(meeting_id: str):
+    """2) Admin get meeting by id"""
+    return await handle_get_meeting_by_id(meeting_id)
 
 @router.post("/admin/meetings/{meeting_id}/reply",
     summary="[ADMIN] Reply to meeting request",
-    description="Admin can reply to meeting request and approve/reject with message",
+    description="Admin gives reply to meeting and user receives email",
     dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
 async def reply_to_meeting(request: Request, meeting_id: str, reply_data: AdminReplySchema):
-    """Admin reply to meeting request with approve/reject"""
-    from controller.scheduleMeetingController import handle_admin_reply_to_meeting
+    """3) Admin give reply to that meeting then user receive mail"""
     return await handle_admin_reply_to_meeting(request, meeting_id, reply_data)
+
+
+@router.put("/admin/meetings/{meeting_id}/complete",
+    summary="[ADMIN] Mark meeting as completed",
+    description="Admin marks meeting as completed",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
+)
+async def complete_meeting(request: Request, meeting_id: str):
+    """5) Admin marks as completed that meeting"""
+    return await handle_admin_complete_meeting(request, meeting_id)
+
+@router.delete("/admin/meetings/{meeting_id}",
+    summary="[ADMIN] Delete meeting",
+    description="Admin can permanently delete a meeting request",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
+)
+async def delete_meeting(request: Request, meeting_id: str):
+    """6) Admin can delete meeting permanently"""
+    return await handle_admin_delete_meeting(request, meeting_id)

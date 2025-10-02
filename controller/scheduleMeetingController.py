@@ -109,7 +109,6 @@ async def handle_get_user_meetings(request: Request, status: Optional[str] = Non
                 'meeting_time': meeting.meeting_time,
                 'message': meeting.message,
                 'status': meeting.status,
-                'admin_notes': meeting.admin_notes,
                 'approved_at': meeting.approved_at,
                 'completed_at': meeting.completed_at,
                 'created_at': meeting.created_at,
@@ -162,7 +161,7 @@ async def handle_get_all_meetings_admin(status: Optional[str] = None, property_i
                 'meeting_time': meeting.meeting_time,
                 'message': meeting.message,
                 'status': meeting.status,
-                'admin_notes': meeting.admin_notes,
+                'admin_message': meeting.admin_message,
                 'approved_at': meeting.approved_at,
                 'completed_at': meeting.completed_at,
                 'created_at': meeting.created_at,
@@ -283,7 +282,7 @@ async def handle_get_meeting_by_id(meeting_id: str):
                 'meeting_time': meeting.meeting_time,
                 'message': meeting.message,
                 'status': meeting.status,
-                'admin_notes': meeting.admin_notes,
+                'admin_message': meeting.admin_message,
                 'approved_at': meeting.approved_at,
                 'completed_at': meeting.completed_at,
                 'created_at': meeting.created_at,
@@ -406,14 +405,23 @@ async def handle_admin_reply_to_meeting(request: Request, meeting_id: str, reply
         except DoesNotExist:
             raise HTTPException(status_code=404, detail="Meeting not found")
         
-        # Update meeting with admin reply
-        meeting.admin_reply = reply_data.admin_reply
+        # Update meeting with admin message
+        meeting.admin_message = reply_data.message
         meeting.admin_reply_date = datetime.now()
-        meeting.status = reply_data.action  # approved or rejected
         
+        # Set status based on action
         if reply_data.action == MeetingStatus.APPROVED:
-            meeting.approved_by_id = admin_user.id
+            meeting.status = MeetingStatus.APPROVED
+            # meeting.approved_by_id = admin_user.id  # Uncomment after running migration
             meeting.approved_at = datetime.now()
+        elif reply_data.action == MeetingStatus.REJECTED:
+            meeting.status = MeetingStatus.REJECTED
+            # meeting.rejected_at = datetime.now()  # Uncomment after running migration
+        else:
+            # If no action or any other case, mark as replied
+            meeting.status = MeetingStatus.REPLIED
+            # meeting.replied_by_id = admin_user.id  # Uncomment after running migration
+            # meeting.replied_at = datetime.now()    # Uncomment after running migration
         
         await meeting.save()
         
@@ -423,19 +431,22 @@ async def handle_admin_reply_to_meeting(request: Request, meeting_id: str, reply
             'meeting_date': meeting.meeting_date.strftime('%B %d, %Y'),
             'meeting_time': meeting.meeting_time.strftime('%I:%M %p'),
             'property_title': meeting.property.title,
-            'admin_reply': meeting.admin_reply,
+            'admin_message': meeting.admin_message,
             'admin_name': admin_user.full_name if hasattr(admin_user, 'full_name') else admin_user.email
         }
         
-        # Send appropriate email based on action
-        if reply_data.action == MeetingStatus.APPROVED:
+        # Send appropriate email based on status
+        if meeting.status == MeetingStatus.APPROVED:
             await send_meeting_approval_email(meeting.email, email_data)
             message = "Meeting approved and confirmation email sent to user"
-        elif reply_data.action == MeetingStatus.REJECTED:
+        elif meeting.status == MeetingStatus.REJECTED:
             await send_meeting_rejection_email(meeting.email, email_data)
             message = "Meeting rejected and notification email sent to user"
         else:
-            message = "Meeting updated successfully"
+            # Status is REPLIED - send general reply email
+            from emailService.meetingEmail import send_admin_reply_email
+            await send_admin_reply_email(meeting.email, email_data)
+            message = "Admin reply sent to user and status marked as replied"
         
         return {
             "success": True,
@@ -443,8 +454,9 @@ async def handle_admin_reply_to_meeting(request: Request, meeting_id: str, reply
             "data": {
                 "meeting_id": str(meeting.id),
                 "status": meeting.status.value,
-                "admin_reply": meeting.admin_reply,
-                "admin_reply_date": meeting.admin_reply_date.isoformat()
+                "admin_message": meeting.admin_message,
+                "admin_reply_date": meeting.admin_reply_date.isoformat(),
+                "action_taken": reply_data.action.value if reply_data.action else "message_only"
             }
         }
         
@@ -452,3 +464,214 @@ async def handle_admin_reply_to_meeting(request: Request, meeting_id: str, reply
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process admin reply: {str(e)}")
+
+
+async def handle_admin_approve_meeting(request: Request, meeting_id: str, message_data: Optional[dict] = None):
+    """Handle admin approve meeting with optional message"""
+    try:
+        # Get current admin user
+        user_payload = await check_for_authentication_cookie(request)
+        admin_user_id = user_payload.get("id")
+        admin_user = await User.get(id=uuid.UUID(admin_user_id))
+        
+        # Get meeting
+        try:
+            meeting = await ScheduleMeeting.get(id=uuid.UUID(meeting_id)).prefetch_related('property')
+        except DoesNotExist:
+            raise HTTPException(status_code=404, detail="Meeting not found")
+        
+        # Update meeting status
+        meeting.status = MeetingStatus.APPROVED
+        meeting.approved_by_id = admin_user.id
+        meeting.approved_at = datetime.now()
+        
+        # Add admin message if provided
+        if message_data and message_data.get("message"):
+            meeting.admin_message = message_data.get("message")
+            meeting.admin_reply_date = datetime.now()
+        
+        await meeting.save()
+        
+        # Prepare email data
+        email_data = {
+            'full_name': meeting.full_name,
+            'meeting_date': meeting.meeting_date.strftime('%B %d, %Y'),
+            'meeting_time': meeting.meeting_time.strftime('%I:%M %p'),
+            'property_title': meeting.property.title,
+            'admin_message': meeting.admin_message or "Your meeting has been approved!",
+            'admin_name': admin_user.full_name if hasattr(admin_user, 'full_name') else admin_user.email
+        }
+        
+        # Send approval email
+        await send_meeting_approval_email(meeting.email, email_data)
+        
+        return {
+            "success": True,
+            "message": "Meeting approved and confirmation email sent to user",
+            "data": {
+                "meeting_id": str(meeting.id),
+                "status": meeting.status.value,
+                "admin_message": meeting.admin_message,
+                "approved_at": meeting.approved_at.isoformat()
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to approve meeting: {str(e)}")
+
+
+async def handle_admin_reject_meeting(request: Request, meeting_id: str, message_data: Optional[dict] = None):
+    """Handle admin reject meeting with optional message"""
+    try:
+        # Get current admin user
+        user_payload = await check_for_authentication_cookie(request)
+        admin_user_id = user_payload.get("id")
+        admin_user = await User.get(id=uuid.UUID(admin_user_id))
+        
+        # Get meeting
+        try:
+            meeting = await ScheduleMeeting.get(id=uuid.UUID(meeting_id)).prefetch_related('property')
+        except DoesNotExist:
+            raise HTTPException(status_code=404, detail="Meeting not found")
+        
+        # Update meeting status
+        meeting.status = MeetingStatus.REJECTED
+        
+        # Add admin message if provided
+        if message_data and message_data.get("message"):
+            meeting.admin_message = message_data.get("message")
+            meeting.admin_reply_date = datetime.now()
+        
+        await meeting.save()
+        
+        # Prepare email data
+        email_data = {
+            'full_name': meeting.full_name,
+            'meeting_date': meeting.meeting_date.strftime('%B %d, %Y'),
+            'meeting_time': meeting.meeting_time.strftime('%I:%M %p'),
+            'property_title': meeting.property.title,
+            'admin_message': meeting.admin_message or "Unfortunately, your meeting request has been rejected.",
+            'admin_name': admin_user.full_name if hasattr(admin_user, 'full_name') else admin_user.email
+        }
+        
+        # Send rejection email
+        await send_meeting_rejection_email(meeting.email, email_data)
+        
+        return {
+            "success": True,
+            "message": "Meeting rejected and notification email sent to user",
+            "data": {
+                "meeting_id": str(meeting.id),
+                "status": meeting.status.value,
+                "admin_message": meeting.admin_message,
+                "rejected_at": datetime.now().isoformat()
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reject meeting: {str(e)}")
+
+
+async def handle_admin_complete_meeting(request: Request, meeting_id: str):
+    """Handle admin mark meeting as completed"""
+    try:
+        # Get current admin user
+        user_payload = await check_for_authentication_cookie(request)
+        admin_user_id = user_payload.get("id")
+        admin_user = await User.get(id=uuid.UUID(admin_user_id))
+        
+        # Get meeting
+        try:
+            meeting = await ScheduleMeeting.get(id=uuid.UUID(meeting_id)).prefetch_related('property')
+        except DoesNotExist:
+            raise HTTPException(status_code=404, detail="Meeting not found")
+        
+        # Update meeting status
+        meeting.status = MeetingStatus.COMPLETED
+        meeting.completed_at = datetime.now()
+        
+        await meeting.save()
+        
+        # Prepare email data
+        email_data = {
+            'full_name': meeting.full_name,
+            'meeting_date': meeting.meeting_date.strftime('%B %d, %Y'),
+            'meeting_time': meeting.meeting_time.strftime('%I:%M %p'),
+            'property_title': meeting.property.title,
+            'admin_name': admin_user.full_name if hasattr(admin_user, 'full_name') else admin_user.email
+        }
+        
+        # Send completion email
+        await send_meeting_completion_email(meeting.email, email_data)
+        
+        return {
+            "success": True,
+            "message": "Meeting marked as completed and notification email sent to user",
+            "data": {
+                "meeting_id": str(meeting.id),
+                "status": meeting.status.value,
+                "completed_at": meeting.completed_at.isoformat()
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to complete meeting: {str(e)}")
+
+
+async def handle_admin_delete_meeting(request: Request, meeting_id: str):
+    """Handle admin delete meeting with notification"""
+    try:
+        # Get current admin user
+        user_payload = await check_for_authentication_cookie(request)
+        admin_user_id = user_payload.get("id")
+        admin_user = await User.get(id=uuid.UUID(admin_user_id))
+        
+        # Get meeting with property details
+        try:
+            meeting = await ScheduleMeeting.get(id=uuid.UUID(meeting_id)).prefetch_related('property')
+        except DoesNotExist:
+            raise HTTPException(status_code=404, detail="Meeting not found")
+        
+        # Store meeting details for email before deletion
+        meeting_details = {
+            'full_name': meeting.full_name,
+            'email': meeting.email,
+            'meeting_id': str(meeting.id),
+            'meeting_date': meeting.meeting_date.strftime('%B %d, %Y'),
+            'meeting_time': meeting.meeting_time.strftime('%I:%M %p'),
+            'property_title': meeting.property.title,
+            'admin_name': admin_user.full_name if hasattr(admin_user, 'full_name') else admin_user.email
+        }
+        
+        # Delete the meeting
+        await meeting.delete()
+        
+        # Send cancellation email to user
+        try:
+            from emailService.meetingEmail import send_meeting_cancellation_email
+            await send_meeting_cancellation_email(meeting_details['email'], meeting_details)
+        except Exception as email_error:
+            # Log email error but don't fail the deletion
+            print(f"Failed to send cancellation email: {email_error}")
+        
+        return {
+            "success": True,
+            "message": "Meeting deleted successfully and cancellation email sent to user",
+            "data": {
+                "deleted_meeting_id": meeting_details['meeting_id'],
+                "user_notified": True,
+                "deleted_by_admin": admin_user.email,
+                "deleted_at": datetime.now().isoformat()
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete meeting: {str(e)}")

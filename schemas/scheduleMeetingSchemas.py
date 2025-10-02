@@ -5,6 +5,7 @@ from enum import Enum
 
 class MeetingStatusEnum(str, Enum):
     PENDING = "pending"
+    REPLIED = "replied"
     APPROVED = "approved"  
     REJECTED = "rejected"
     COMPLETED = "completed"
@@ -41,15 +42,14 @@ class ScheduleMeetingCreate(BaseModel):
 
 class ScheduleMeetingUpdate(BaseModel):
     status: Optional[MeetingStatusEnum] = None
-    admin_notes: Optional[str] = None
-    admin_reply: Optional[str] = None  # Admin reply message
+    admin_message: Optional[str] = None  # Single admin message field
     meeting_date: Optional[date] = None
     meeting_time: Optional[time] = None
 
 class AdminReplySchema(BaseModel):
     """Schema for admin reply to meeting"""
-    admin_reply: str
-    action: MeetingStatusEnum  # approve or reject
+    message: str
+    action: Optional[MeetingStatusEnum] = None  # approve or reject (optional)
 
 class ScheduleMeetingResponse(BaseModel):
     id: str
@@ -62,8 +62,7 @@ class ScheduleMeetingResponse(BaseModel):
     user_id: Optional[str] = None
     message: Optional[str] = None
     status: str
-    admin_notes: Optional[str] = None
-    admin_reply: Optional[str] = None
+    admin_message: Optional[str] = None
     admin_reply_date: Optional[datetime] = None
     approved_by: Optional[str] = None
     approved_at: Optional[datetime] = None
@@ -83,8 +82,7 @@ class ScheduleMeetingWithProperty(BaseModel):
     meeting_time: time
     message: Optional[str] = None
     status: str
-    admin_notes: Optional[str] = None
-    admin_reply: Optional[str] = None
+    admin_message: Optional[str] = None
     admin_reply_date: Optional[datetime] = None
     approved_by: Optional[str] = None
     approved_at: Optional[datetime] = None
