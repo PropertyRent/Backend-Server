@@ -151,47 +151,6 @@ async def startup_event():
 from fastapi import Form, File, UploadFile
 from typing import Optional, List
 
-@app.post("/api/test-form")
-async def test_form_data(
-    title: str = Form(...),
-    description: Optional[str] = Form(None),
-    file: Optional[UploadFile] = File(None)
-):
-    return {
-        "message": "Form data received successfully",
-        "title": title,
-        "description": description,
-        "file_name": file.filename if file else None,
-        "file_size": file.size if file else None
-    }
-
-# Test endpoint for multiple file uploads
-@app.post("/api/test-multiple-files")
-async def test_multiple_files(
-    title: str = Form(...),
-    files: List[UploadFile] = File(...)
-):
-    file_info = []
-    total_size = 0
-    
-    for file in files:
-        if file:
-            content = await file.read()
-            size = len(content)
-            total_size += size
-            file_info.append({
-                "filename": file.filename,
-                "size": size,
-                "content_type": file.content_type
-            })
-            await file.seek(0)
-    
-    return {
-        "message": f"Received {len(files)} files successfully",
-        "title": title,
-        "files": file_info,
-        "total_size": total_size
-    }
 
 @app.options("/{path:path}")
 async def options_handler(path: str, response: Response):

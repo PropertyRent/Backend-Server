@@ -16,12 +16,12 @@ router = APIRouter(tags=["Contact"])
 router.post("/contact", summary="Submit contact form (public)")(create_contact_message)
 
 # Admin only endpoints - require admin authentication
-router.get("/contact", summary="Get all contact messages (admin only)")(get_all_contact_messages)
+router.get("/contacts", summary="Get all contact messages (admin only)")(get_all_contact_messages)
 
-router.get("/contact/{contact_id}", summary="Get contact message by ID (admin only)")(get_contact_message_by_id)
+router.get("/contacts/{contact_id}", summary="Get contact message by ID (admin only)")(get_contact_message_by_id)
 
-router.post("/contact/{contact_id}/reply", summary="Reply to contact message (admin only)")(reply_to_contact_message)
+router.post("/contacts/{contact_id}/reply", summary="Reply to contact message (admin only)")(reply_to_contact_message)
 
-router.put("/contact/{contact_id}/status", summary="Update contact status (admin only)")(update_contact_status)
+router.put("/contacts/{contact_id}/status", summary="Update contact status (admin only)")(update_contact_status)
 
-router.delete("/contact/{contact_id}", summary="Delete contact message (admin only)")(delete_contact_message)
+router.delete("/contacts/{contact_id}", summary="Delete contact message (admin only)")(delete_contact_message)
