@@ -16,8 +16,8 @@ def set_token_cookie(response: Response, token: str ):
         value=token,
         max_age=max_age,
         httponly=True,
-        secure=True,  
-        samesite="none",
+        secure=False,  
+        samesite="lax",
         path="/",
     )
 
@@ -28,8 +28,8 @@ def set_token_cookie(response: Response, token: str ):
         value=token,
         max_age=max_age,
         httponly=False,  # Accessible by JavaScript
-        secure=True,  
-        samesite="none",
+        secure=False,  
+        samesite="lax",
         path="/",
     )
 
@@ -44,7 +44,7 @@ def clear_token_cookie(response: Response):
         # domain=".pixbit.me",
         key="token",
         path="/",
-        samesite="none",   
+        samesite="lax",   
         httponly=True
     )
     
@@ -53,6 +53,6 @@ def clear_token_cookie(response: Response):
         # domain=".pixbit.me",
         key="token_middleware",
         path="/",
-        samesite="none",   
+        samesite="lax",   
         httponly=False
     )
