@@ -710,8 +710,20 @@ async def download_notice_file(notice_id: str):
             )
         
         try:
+            # Clean the base64 string (remove data URL prefix if present)
+            base64_data = notice.notice_file
+            if base64_data.startswith('data:'):
+                # Remove data URL prefix like "data:application/pdf;base64," 
+                base64_data = base64_data.split(',', 1)[1]
+            
+            # Remove any whitespace or newlines
+            base64_data = base64_data.replace('\n', '').replace('\r', '').replace(' ', '')
+            
+            print(f"📁 Base64 data length: {len(base64_data)}")
+            print(f"📁 First 100 chars of base64: {base64_data[:100]}")
+            
             # Decode base64 file data
-            file_data = base64.b64decode(notice.notice_file)
+            file_data = base64.b64decode(base64_data)
             
             # Determine content type based on file type
             content_type_mapping = {
@@ -741,7 +753,7 @@ async def download_notice_file(notice_id: str):
                 # Fallback filename
                 filename = f"notice_{notice.id}.{file_extension or 'bin'}"
             
-            print(f"📁 File download successful - filename: {filename}, size: {len(file_data)} bytes")
+            print(f"📁 File download successful - filename: {filename}, size: {len(file_data)} bytes, type: {content_type}")
             
             # Return file as response with proper headers
             return Response(
@@ -768,4 +780,78 @@ async def download_notice_file(notice_id: str):
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to download notice file: {str(e)}"
+        )
+
+
+async def debug_notice_file(notice_id: str):
+    """Debug notice file data - Show file info for troubleshooting"""
+    try:
+        print(f"🔍 Debugging notice file for ID: {notice_id}")
+        
+        # Get notice
+        try:
+            notice = await Notice.get(id=uuid.UUID(notice_id))
+        except DoesNotExist:
+            raise HTTPException(
+                status_code=HTTP_404_NOT_FOUND,
+                detail="Notice not found"
+            )
+        except ValueError:
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST,
+                detail="Invalid notice ID format"
+            )
+        
+        # Check if notice has a file
+        if not notice.notice_file:
+            return {
+                "success": False,
+                "message": "No file attached to this notice",
+                "data": {
+                    "notice_id": str(notice.id),
+                    "title": notice.title,
+                    "has_file": False
+                }
+            }
+        
+        file_info = {
+            "notice_id": str(notice.id),
+            "title": notice.title,
+            "has_file": True,
+            "original_filename": notice.original_filename,
+            "file_type": notice.file_type,
+            "base64_length": len(notice.notice_file),
+            "starts_with_data_url": notice.notice_file.startswith('data:'),
+            "base64_prefix": notice.notice_file[:100] if len(notice.notice_file) > 100 else notice.notice_file
+        }
+        
+        # Try to decode and get file size
+        try:
+            import base64
+            base64_data = notice.notice_file
+            if base64_data.startswith('data:'):
+                base64_data = base64_data.split(',', 1)[1]
+            
+            base64_data = base64_data.replace('\n', '').replace('\r', '').replace(' ', '')
+            file_data = base64.b64decode(base64_data)
+            file_info["decoded_size"] = len(file_data)
+            file_info["decode_success"] = True
+            
+        except Exception as decode_error:
+            file_info["decode_success"] = False
+            file_info["decode_error"] = str(decode_error)
+        
+        return {
+            "success": True,
+            "message": "File debug information",
+            "data": file_info
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error debugging notice file: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to debug notice file: {str(e)}"
         )

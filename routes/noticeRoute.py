@@ -9,7 +9,8 @@ from controller.noticeController import (
     get_active_notices,
     download_notice_file,
     toggle_notice_active,
-    set_notice_active
+    set_notice_active,
+    debug_notice_file
 )
 from authMiddleware.authMiddleware import check_for_authentication_cookie
 from authMiddleware.roleMiddleware import require_admin
