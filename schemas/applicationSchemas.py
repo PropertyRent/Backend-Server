@@ -151,6 +151,7 @@ class LeaseSigningPaymentSchema(BaseModel):
     first_month_rent: Optional[PaymentSchema] = None
 
 class RentalApplicationCreate(BaseModel):
+    property_id: Optional[str] = None  # Property UUID as string
     personal_information: Optional[PersonalInformationSchema] = None
     residential_history: Optional[ResidentialHistorySchema] = None
     employment_income: Optional[EmploymentIncomeSchema] = None
@@ -178,6 +179,10 @@ class RentalApplicationResponse(BaseModel):
     admin_reply_date: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+    
+    # Property information
+    property_id: Optional[str] = None
+    property_details: Optional[Dict[str, Any]] = None
     
     # All the detailed fields for complete response
     personal_information: Optional[Dict[str, Any]] = None

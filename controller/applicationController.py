@@ -8,6 +8,7 @@ from datetime import datetime, date
 
 from model.applicationModel import RentalApplication, ApplicationStatus
 from model.userModel import User
+from model.propertyModel import Property
 from schemas.applicationSchemas import (
     RentalApplicationCreate,
     RentalApplicationUpdate,
@@ -25,7 +26,7 @@ from services.encryptionService import encryption_service, SENSITIVE_FIELDS
 
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@propertyrent.com")
 
-def format_application_data(application: RentalApplication) -> dict:
+async def format_application_data(application: RentalApplication) -> dict:
     """Format application data for response with decrypted sensitive fields"""
     
     # Personal Information (decrypt sensitive fields)
@@ -144,6 +145,45 @@ def format_application_data(application: RentalApplication) -> dict:
         }
     }
     
+    # Property details if property is linked
+    property_details = None
+    if application.property_id:
+        try:
+            property_instance = await Property.get(id=application.property_id)
+            property_details = {
+                "id": str(property_instance.id),
+                "title": property_instance.title,
+                "description": property_instance.description,
+                "property_type": property_instance.property_type,
+                "status": property_instance.status,
+                "furnishing": property_instance.furnishing,
+                "area_sqft": float(property_instance.area_sqft) if property_instance.area_sqft else None,
+                "bedrooms": property_instance.bedrooms,
+                "bathrooms": property_instance.bathrooms,
+                "floors": property_instance.floors,
+                "utilities": property_instance.utilities,
+                "lease_term": property_instance.lease_term,
+                "application_fee": float(property_instance.application_fee) if property_instance.application_fee else None,
+                "amenities": property_instance.amenities,
+                "pet_policy": property_instance.pet_policy,
+                "appliances_included": property_instance.appliances_included,
+                "property_management_contact": property_instance.property_management_contact,
+                "website": property_instance.website,
+                "price": float(property_instance.price) if property_instance.price else None,
+                "deposit": float(property_instance.deposit) if property_instance.deposit else None,
+                "address": property_instance.address,
+                "city": property_instance.city,
+                "state": property_instance.state,
+                "pincode": property_instance.pincode,
+                "latitude": float(property_instance.latitude) if property_instance.latitude else None,
+                "longitude": float(property_instance.longitude) if property_instance.longitude else None,
+                "available_from": property_instance.available_from.isoformat() if property_instance.available_from else None,
+                "created_at": property_instance.created_at.isoformat(),
+                "updated_at": property_instance.updated_at.isoformat()
+            }
+        except DoesNotExist:
+            property_details = {"error": "Property not found or may have been deleted"}
+
     return {
         "id": str(application.id),
         "status": application.status.value,
@@ -151,6 +191,8 @@ def format_application_data(application: RentalApplication) -> dict:
         "admin_reply_date": application.admin_reply_date.isoformat() if application.admin_reply_date else None,
         "created_at": application.created_at.isoformat(),
         "updated_at": application.updated_at.isoformat(),
+        "property_id": str(application.property_id) if application.property_id else None,
+        "property_details": property_details,
         "personal_information": personal_info,
         "residential_history": residential_history,
         "employment_income": employment_income,
@@ -174,8 +216,21 @@ async def handle_submit_application(application_data: RentalApplicationCreate):
         signature_ack = application_data.signature_acknowledgment or {}
         lease_payment = application_data.lease_signing_payment or {}
         
+        # Validate property_id if provided
+        property_instance = None
+        if application_data.property_id:
+            try:
+                property_instance = await Property.get(id=uuid.UUID(application_data.property_id))
+            except DoesNotExist:
+                raise HTTPException(status_code=404, detail=f"Property with ID {application_data.property_id} not found")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid property ID format")
+
         # Create application record
         application = await RentalApplication.create(
+            # Property reference
+            property_id=uuid.UUID(application_data.property_id) if application_data.property_id else None,
+            
             # Personal Information (encrypt sensitive fields)
             full_name=personal_info.full_name if personal_info else None,
             email=personal_info.email if personal_info else None,
@@ -282,19 +337,34 @@ async def handle_submit_application(application_data: RentalApplicationCreate):
                 'full_name': application.full_name,
                 'email': application.email,
                 'phone_number': application.phone_number,
-                'submitted_date': application.created_at.strftime('%B %d, %Y')
+                'submitted_date': application.created_at.strftime('%B %d, %Y'),
+                'property_title': property_instance.title if property_instance else "No property specified",
+                'property_address': f"{property_instance.address}, {property_instance.city}, {property_instance.state}" if property_instance else None
             }
             await notify_admin_new_application(ADMIN_EMAIL, admin_email_data)
         except Exception as e:
             print(f"Failed to send admin notification: {e}")
         
+        # Include property information in response if provided
+        property_info = None
+        if property_instance:
+            property_info = {
+                "property_id": str(property_instance.id),
+                "title": property_instance.title,
+                "address": property_instance.address,
+                "city": property_instance.city,
+                "state": property_instance.state,
+                "price": float(property_instance.price) if property_instance.price else None
+            }
+
         return {
             "success": True,
             "message": "Application submitted successfully",
             "data": {
                 "application_id": str(application.id),
                 "status": application.status.value,
-                "submitted_at": application.created_at.isoformat()
+                "submitted_at": application.created_at.isoformat(),
+                "property_info": property_info
             }
         }
         
@@ -324,6 +394,23 @@ async def handle_get_all_applications(status: Optional[str] = None, search: Opti
         # Format response
         application_list = []
         for app in applications:
+            # Get basic property info if property is linked
+            property_basic_info = None
+            if app.property_id:
+                try:
+                    property_instance = await Property.get(id=app.property_id)
+                    property_basic_info = {
+                        "id": str(property_instance.id),
+                        "title": property_instance.title,
+                        "property_type": property_instance.property_type,
+                        "price": float(property_instance.price) if property_instance.price else None,
+                        "address": property_instance.address,
+                        "city": property_instance.city,
+                        "state": property_instance.state
+                    }
+                except DoesNotExist:
+                    property_basic_info = {"error": "Property not found"}
+
             application_list.append({
                 "id": str(app.id),
                 "full_name": app.full_name,
@@ -333,7 +420,9 @@ async def handle_get_all_applications(status: Optional[str] = None, search: Opti
                 "admin_reply": app.admin_reply,
                 "admin_reply_date": app.admin_reply_date.isoformat() if app.admin_reply_date else None,
                 "created_at": app.created_at.isoformat(),
-                "updated_at": app.updated_at.isoformat()
+                "updated_at": app.updated_at.isoformat(),
+                "property_id": str(app.property_id) if app.property_id else None,
+                "property_basic_info": property_basic_info
             })
         
         return {
@@ -358,7 +447,7 @@ async def handle_get_application_by_id(application_id: str):
         # Return complete application data
         return {
             "success": True,
-            "data": format_application_data(application)
+            "data": await format_application_data(application)
         }
         
     except HTTPException:

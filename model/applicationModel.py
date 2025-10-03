@@ -13,6 +13,9 @@ class ApplicationStatus(str, Enum):
 class RentalApplication(models.Model):
     id = fields.UUIDField(pk=True, default=uuid.uuid4)
     
+    # Property Reference
+    property = fields.ForeignKeyField("models.Property", related_name="applications", null=True, on_delete=fields.SET_NULL)
+    
     # Status and tracking
     status = fields.CharEnumField(ApplicationStatus, default=ApplicationStatus.PENDING)
     admin_reply = fields.TextField(null=True)
