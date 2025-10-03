@@ -380,14 +380,57 @@ async def get_booking_analytics(booking_page_id: Optional[str] = None):
                 "cancelled_bookings": cancelled_bookings,
                 "completed_bookings": completed_bookings,
                 "no_show_bookings": no_show_bookings,
+                "cancellation_rate": (cancelled_bookings / total_bookings * 100) if total_bookings > 0 else 0,
+                "completion_rate": (completed_bookings / total_bookings * 100) if total_bookings > 0 else 0,
+                "average_duration_minutes": round(average_duration, 2),
                 "most_popular_times": most_popular_times,
-                "booking_trends": monthly_trends,
-                "average_booking_duration": round(average_duration, 1)
+                "monthly_trends": [
+                    {"month": month, "bookings": count}
+                    for month, count in sorted(monthly_trends.items())
+                ]
             }
         }
         
-    except HTTPException:
-        raise
     except Exception as e:
         print(f"❌ Error getting booking analytics: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get booking analytics: {str(e)}")
+
+async def check_property_booking_availability(property_id: str):
+    """Check if a property has booking page available"""
+    try:
+        # Check if property has active booking page
+        booking_page = await TidyCalBookingPage.filter(
+            property_id=uuid.UUID(property_id),
+            status=BookingPageStatus.ACTIVE
+        ).select_related("property").first()
+        
+        if booking_page:
+            return {
+                "success": True,
+                "data": {
+                    "property_id": property_id,
+                    "has_booking_available": True,
+                    "booking_url": booking_page.booking_url,
+                    "booking_redirect_url": f"/tidycal/properties/{property_id}/book-viewing",
+                    "page_name": booking_page.page_name,
+                    "duration_minutes": booking_page.duration_minutes,
+                    "description": booking_page.description
+                }
+            }
+        else:
+            return {
+                "success": True,
+                "data": {
+                    "property_id": property_id,
+                    "has_booking_available": False,
+                    "booking_url": None,
+                    "booking_redirect_url": None,
+                    "message": "Property viewing booking is not available for this property"
+                }
+            }
+            
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid property ID format")
+    except Exception as e:
+        print(f"❌ Error checking booking availability: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to check booking availability: {str(e)}")

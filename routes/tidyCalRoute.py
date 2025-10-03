@@ -7,7 +7,8 @@ from controller.tidyCalController import (
     get_booking_page_embed_code,
     handle_tidycal_webhook,
     get_tidycal_integration_status,
-    get_booking_analytics
+    get_booking_analytics,
+    check_property_booking_availability
 )
 from schemas.tidyCalSchemas import (
     TidyCalBookingPageCreate,
@@ -171,6 +172,48 @@ async def get_property_booking_url(property_id: str):
         }
     }
 
+@router.get("/tidycal/properties/{property_id}/book-viewing",
+    summary="[PUBLIC] Redirect to TidyCal booking page",
+    description="Redirect users directly to TidyCal booking page for property viewing"
+)
+async def redirect_to_property_booking(property_id: str):
+    """
+    Redirect users directly to TidyCal booking page for property viewing.
+    
+    - **property_id**: UUID of the property
+    
+    This endpoint redirects users to the TidyCal booking page for scheduling a property viewing.
+    Perfect for "Book Schedule Viewing" buttons on property details pages.
+    """
+    from fastapi.responses import RedirectResponse
+    from fastapi import HTTPException
+    
+    booking_pages = await get_property_booking_pages(property_id)
+    
+    if not booking_pages.get("success") or not booking_pages["data"]["booking_pages"]:
+        raise HTTPException(status_code=404, detail="Property viewing booking not available for this property")
+    
+    booking_page = booking_pages["data"]["booking_pages"][0]
+    booking_url = booking_page["booking_url"]
+    
+    # Redirect to TidyCal booking page
+    return RedirectResponse(url=booking_url, status_code=302)
+
+@router.get("/tidycal/properties/{property_id}/booking-status",
+    summary="[PUBLIC] Check property booking availability",
+    description="Check if property has booking page available and get booking details"
+)
+async def get_property_booking_status(property_id: str):
+    """
+    Check if property has booking page available and get booking details.
+    
+    - **property_id**: UUID of the property
+    
+    Returns booking availability status and booking details if available.
+    Perfect for showing/hiding "Book Schedule Viewing" buttons.
+    """
+    return await check_property_booking_availability(property_id)
+
 # === WEBHOOK ENDPOINTS ===
 
 @router.post("/tidycal/webhook",
@@ -251,9 +294,17 @@ async def get_integration_guide():
                     }
                 },
                 "webhook_setup": {
-                    "url": "https://your-domain.com/api/tidycal/webhook",
+                    "url": "https://yourdomain.com/api/tidycal/webhook",
+                    "local_dev_url": "http://localhost:8001/api/tidycal/webhook",
                     "events": ["booking.created", "booking.cancelled", "booking.completed", "booking.rescheduled"],
-                    "security": "Webhook signature verification implemented"
+                    "security": "Webhook signature verification implemented",
+                    "setup_instructions": [
+                        "1. Log into your TidyCal dashboard",
+                        "2. Go to Settings → Integrations → Webhooks",
+                        "3. Add webhook URL: https://yourdomain.com/api/tidycal/webhook",
+                        "4. Select events: booking.created, booking.cancelled, booking.completed, booking.rescheduled",
+                        "5. Set webhook secret in your .env file: TIDYCAL_WEBHOOK_SECRET=your_secret"
+                    ]
                 }
             }
         }
