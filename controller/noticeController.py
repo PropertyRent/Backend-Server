@@ -678,3 +678,94 @@ async def set_notice_active(notice_id: str, is_active: bool):
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to set notice active status: {str(e)}"
         )
+
+
+async def download_notice_file(notice_id: str):
+    """Download notice file - Accessible to both admin and public"""
+    try:
+        import base64
+        from fastapi.responses import Response
+        
+        print(f"📁 Downloading notice file for ID: {notice_id}")
+        
+        # Get notice
+        try:
+            notice = await Notice.get(id=uuid.UUID(notice_id))
+        except DoesNotExist:
+            raise HTTPException(
+                status_code=HTTP_404_NOT_FOUND,
+                detail="Notice not found"
+            )
+        except ValueError:
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST,
+                detail="Invalid notice ID format"
+            )
+        
+        # Check if notice has a file
+        if not notice.notice_file:
+            raise HTTPException(
+                status_code=HTTP_404_NOT_FOUND,
+                detail="No file attached to this notice"
+            )
+        
+        try:
+            # Decode base64 file data
+            file_data = base64.b64decode(notice.notice_file)
+            
+            # Determine content type based on file type
+            content_type_mapping = {
+                'pdf': 'application/pdf',
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'png': 'image/png',
+                'gif': 'image/gif',
+                'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'doc': 'application/msword',
+                'txt': 'text/plain'
+            }
+            
+            # Get file extension from original filename or file_type
+            file_extension = None
+            if notice.original_filename:
+                file_extension = notice.original_filename.split('.')[-1].lower()
+            elif notice.file_type:
+                file_extension = notice.file_type.lower()
+            
+            content_type = content_type_mapping.get(file_extension, 'application/octet-stream')
+            
+            # Create filename for download
+            if notice.original_filename:
+                filename = notice.original_filename
+            else:
+                # Fallback filename
+                filename = f"notice_{notice.id}.{file_extension or 'bin'}"
+            
+            print(f"📁 File download successful - filename: {filename}, size: {len(file_data)} bytes")
+            
+            # Return file as response with proper headers
+            return Response(
+                content=file_data,
+                media_type=content_type,
+                headers={
+                    "Content-Disposition": f"attachment; filename=\"{filename}\"",
+                    "Content-Length": str(len(file_data)),
+                    "Cache-Control": "no-cache"
+                }
+            )
+            
+        except Exception as decode_error:
+            print(f"❌ File decoding error: {decode_error}")
+            raise HTTPException(
+                status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to decode file data. File may be corrupted."
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error downloading notice file: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to download notice file: {str(e)}"
+        )

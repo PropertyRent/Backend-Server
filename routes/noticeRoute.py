@@ -6,7 +6,10 @@ from controller.noticeController import (
     delete_notice,
     get_all_notices,
     get_notice_by_id,
-    get_active_notices
+    get_active_notices,
+    download_notice_file,
+    toggle_notice_active,
+    set_notice_active
 )
 from authMiddleware.authMiddleware import check_for_authentication_cookie
 from authMiddleware.roleMiddleware import require_admin
@@ -144,7 +147,6 @@ async def toggle_notice_active_status(notice_id: str):
     
     Returns the updated notice with new status.
     """
-    from controller.noticeController import toggle_notice_active
     return await toggle_notice_active(notice_id)
 
 
@@ -163,7 +165,6 @@ async def set_notice_active_status(notice_id: str, is_active: bool = Form(...)):
     
     Returns the updated notice with new status.
     """
-    from controller.noticeController import set_notice_active
     return await set_notice_active(notice_id, is_active)
 
 
@@ -193,3 +194,36 @@ async def get_active_notices_route(
         offset=offset,
         search=search
     )
+
+
+# === FILE DOWNLOAD ROUTES ===
+
+@router.get("/notices/{notice_id}/download",
+    summary="[PUBLIC] Download notice file",
+    description="Download attached file from a notice. Accessible to both admin and public users."
+)
+async def download_notice_file_public(notice_id: str):
+    """
+    Download the file attached to a specific notice.
+    
+    - **notice_id**: UUID of the notice
+    
+    Returns the file with proper headers for download. Supports PDF, DOCX, DOC, and image files.
+    """
+    return await download_notice_file(notice_id)
+
+
+@router.get("/admin/notices/{notice_id}/download",
+    summary="[ADMIN] Download notice file",
+    description="Admin endpoint to download attached file from any notice.",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
+)
+async def download_notice_file_admin(notice_id: str):
+    """
+    Admin endpoint to download the file attached to a specific notice.
+    
+    - **notice_id**: UUID of the notice
+    
+    Returns the file with proper headers for download. Supports PDF, DOCX, DOC, and image files.
+    """
+    return await download_notice_file(notice_id)
