@@ -16,6 +16,7 @@ from routes.noticeRoute import router as notice_router
 from routes.propertyRecommendationRoute import router as recommendation_router
 from routes.chatbotRoute import router as chatbot_router
 from routes.applicationRoute import router as application_router
+from routes.tidyCalRoute import router as tidycal_router
 
 from dbConnection.dbConfig import init_db  
 
@@ -144,6 +145,9 @@ app.include_router(chatbot_router, prefix="/api", tags=["Chatbot"])  # Mixed acc
 
 # Rental application routes - public application submission, admin management
 app.include_router(application_router, prefix="/api", tags=["Rental Applications"])  # Mixed access levels
+
+# TidyCal integration routes - public booking widgets, admin management
+app.include_router(tidycal_router, prefix="/api", tags=["TidyCal Integration"])  # Mixed access levels
 
 init_db(app)
 
