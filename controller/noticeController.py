@@ -11,6 +11,7 @@ from starlette.status import (
 )
 from tortoise.exceptions import DoesNotExist, IntegrityError
 from tortoise.transactions import in_transaction
+from tortoise.expressions import Q
 
 from model.noticeModel import Notice
 from schemas.noticeSchemas import NoticeCreate, NoticeUpdate, NoticeResponse
@@ -178,7 +179,7 @@ async def get_all_notices(
         
         # Apply search filter
         if search:
-            query = query.filter(title__icontains=search) | query.filter(description__icontains=search)
+            query = query.filter(Q(title__icontains=search) | Q(description__icontains=search))
         
         # Get total count
         total = await query.count()
@@ -469,11 +470,7 @@ async def get_active_notices(
         
         # Add search filter if provided
         if search:
-            query = query.filter(
-                title__icontains=search
-            ).union(
-                Notice.filter(is_active=True, description__icontains=search)
-            )
+            query = query.filter(Q(title__icontains=search) | Q(description__icontains=search))
         
         # Get total count for pagination
         total = await query.count()
