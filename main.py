@@ -15,6 +15,7 @@ from routes.scheduleMeetingRoute import router as meeting_router
 from routes.noticeRoute import router as notice_router
 from routes.propertyRecommendationRoute import router as recommendation_router
 from routes.chatbotRoute import router as chatbot_router
+from routes.applicationRoute import router as application_router
 
 from dbConnection.dbConfig import init_db  
 
@@ -140,6 +141,9 @@ app.include_router(recommendation_router, prefix="/api", tags=["Property Recomme
 
 # Chatbot routes - public chat interface and admin management
 app.include_router(chatbot_router, prefix="/api", tags=["Chatbot"])  # Mixed access levels
+
+# Rental application routes - public application submission, admin management
+app.include_router(application_router, prefix="/api", tags=["Rental Applications"])  # Mixed access levels
 
 init_db(app)
 

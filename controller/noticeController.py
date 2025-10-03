@@ -89,6 +89,7 @@ async def update_notice(notice_id: str, notice_data: NoticeUpdate):
         
         # Update the notice
         await notice_obj.update_from_dict(update_data)
+
         await notice_obj.save()
         
         return JSONResponse(
@@ -101,10 +102,12 @@ async def update_notice(notice_id: str, notice_data: NoticeUpdate):
                     "title": notice_obj.title,
                     "description": notice_obj.description,
                     "notice_file": notice_obj.notice_file,
+                    
                     "file_type": notice_obj.file_type,
                     "original_filename": notice_obj.original_filename,
                     "created_at": notice_obj.created_at.isoformat(),
-                    "updated_at": notice_obj.updated_at.isoformat()
+                    "updated_at": notice_obj.updated_at.isoformat(),
+                    "is_active": notice_obj.is_active
                 }
             }
         )
@@ -191,6 +194,7 @@ async def get_all_notices(
                 "title": notice.title,
                 "description": notice.description,
                 "notice_file": notice.notice_file,
+                "is_active": notice.is_active,
                 "file_type": notice.file_type,
                 "original_filename": notice.original_filename,
                 "created_at": notice.created_at.isoformat(),
@@ -252,6 +256,7 @@ async def get_notice_by_id(notice_id: str):
                     "title": notice_obj.title,
                     "description": notice_obj.description,
                     "notice_file": notice_obj.notice_file,
+                    "is_active": notice_obj.is_active,
                     "file_type": notice_obj.file_type,
                     "original_filename": notice_obj.original_filename,
                     "created_at": notice_obj.created_at.isoformat(),
@@ -322,6 +327,7 @@ async def handle_create_notice(
                 "title": new_notice.title,
                 "description": new_notice.description,
                 "notice_file": new_notice.notice_file,
+                "is_active": new_notice.is_active,
                 "file_type": new_notice.file_type,
                 "original_filename": new_notice.original_filename,
                 "created_at": new_notice.created_at.isoformat(),
@@ -515,4 +521,163 @@ async def get_active_notices(
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve active notices: {str(e)}"
+        )
+
+
+# === NOTICE ACTIVE STATUS MANAGEMENT ===
+
+async def toggle_notice_active(notice_id: str):
+    """Toggle the active status of a notice (true to false or false to true)"""
+    try:
+        # Validate UUID
+        try:
+            notice_uuid = uuid.UUID(notice_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST,
+                detail="Invalid notice ID format"
+            )
+        
+        # Check if notice exists
+        notice_obj = await Notice.get_or_none(id=notice_uuid)
+        if not notice_obj:
+            raise HTTPException(
+                status_code=HTTP_404_NOT_FOUND,
+                detail="Notice not found"
+            )
+        
+        # Store old status for logging
+        old_status = notice_obj.is_active
+        new_status = not old_status
+        
+        print(f"📢 Toggling notice '{notice_obj.title}' from {old_status} to {new_status}")
+        
+        # Update the active status
+        notice_obj.is_active = new_status
+        await notice_obj.save()
+        
+        status_text = "activated" if new_status else "deactivated"
+        visibility = "visible to public" if new_status else "hidden from public"
+        
+        return JSONResponse(
+            status_code=HTTP_200_OK,
+            content={
+                "success": True,
+                "message": f"Notice {status_text} successfully - now {visibility}",
+                "data": {
+                    "id": str(notice_obj.id),
+                    "title": notice_obj.title,
+                    "description": notice_obj.description,
+                    "is_active": notice_obj.is_active,
+                    "file_type": notice_obj.file_type,
+                    "original_filename": notice_obj.original_filename,
+                    "created_at": notice_obj.created_at.isoformat(),
+                    "updated_at": notice_obj.updated_at.isoformat(),
+                    "status_change": {
+                        "old_status": old_status,
+                        "new_status": new_status,
+                        "action": status_text
+                    }
+                }
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Failed to toggle notice active status: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to toggle notice active status: {str(e)}"
+        )
+
+
+async def set_notice_active(notice_id: str, is_active: bool):
+    """Set the active status of a notice to a specific value"""
+    try:
+        # Validate UUID
+        try:
+            notice_uuid = uuid.UUID(notice_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST,
+                detail="Invalid notice ID format"
+            )
+        
+        # Check if notice exists
+        notice_obj = await Notice.get_or_none(id=notice_uuid)
+        if not notice_obj:
+            raise HTTPException(
+                status_code=HTTP_404_NOT_FOUND,
+                detail="Notice not found"
+            )
+        
+        # Store old status for logging
+        old_status = notice_obj.is_active
+        
+        print(f"📢 Setting notice '{notice_obj.title}' active status from {old_status} to {is_active}")
+        
+        # Check if change is needed
+        if old_status == is_active:
+            status_text = "active" if is_active else "inactive" 
+            return JSONResponse(
+                status_code=HTTP_200_OK,
+                content={
+                    "success": True,
+                    "message": f"Notice is already {status_text} - no change needed",
+                    "data": {
+                        "id": str(notice_obj.id),
+                        "title": notice_obj.title,
+                        "description": notice_obj.description,
+                        "is_active": notice_obj.is_active,
+                        "file_type": notice_obj.file_type,
+                        "original_filename": notice_obj.original_filename,
+                        "created_at": notice_obj.created_at.isoformat(),
+                        "updated_at": notice_obj.updated_at.isoformat(),
+                        "status_change": {
+                            "old_status": old_status,
+                            "new_status": is_active,
+                            "action": "no change"
+                        }
+                    }
+                }
+            )
+        
+        # Update the active status
+        notice_obj.is_active = is_active
+        await notice_obj.save()
+        
+        status_text = "activated" if is_active else "deactivated"
+        visibility = "visible to public" if is_active else "hidden from public"
+        
+        return JSONResponse(
+            status_code=HTTP_200_OK,
+            content={
+                "success": True,
+                "message": f"Notice {status_text} successfully - now {visibility}",
+                "data": {
+                    "id": str(notice_obj.id),
+                    "title": notice_obj.title,
+                    "description": notice_obj.description,
+                    "is_active": notice_obj.is_active,
+                    "file_type": notice_obj.file_type,
+                    "original_filename": notice_obj.original_filename,
+                    "created_at": notice_obj.created_at.isoformat(),
+                    "updated_at": notice_obj.updated_at.isoformat(),
+                    "status_change": {
+                        "old_status": old_status,
+                        "new_status": is_active,
+                        "action": status_text
+                    }
+                }
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Failed to set notice active status: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to set notice active status: {str(e)}"
         )

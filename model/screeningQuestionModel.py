@@ -7,6 +7,7 @@ class QuestionType(str, Enum):
     TEXT = "text"
     NUMBER = "number" 
     DATE = "date"
+    YESNO = "yesno"
 
 class ScreeningQuestion(Model):
     id = fields.UUIDField(pk=True, default=uuid.uuid4)
@@ -27,7 +28,10 @@ class ScreeningResponse(Model):
     id = fields.UUIDField(pk=True, default=uuid.uuid4)
     full_name = fields.CharField(max_length=100)
     email = fields.CharField(max_length=150)
+    phone = fields.CharField(max_length=20)  # Added phone field for user contact
     message = fields.TextField(null=True)  # Optional message from user
+    admin_reply = fields.TextField(null=True)  # Admin's reply to the response
+    replied_at = fields.DatetimeField(null=True)  # When admin replied
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
@@ -41,6 +45,7 @@ class ScreeningAnswer(Model):
     answer_text = fields.TextField(null=True)  # For text answers
     answer_number = fields.IntField(null=True)  # For number answers
     answer_date = fields.DateField(null=True)  # For date answers
+    answer_yesno = fields.BooleanField(null=True)  # For yes/no answers
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:

@@ -17,7 +17,7 @@ router = APIRouter(tags=["Notices"])
 # === UNIFIED NOTICE CRUD OPERATIONS ===
 # Single routes that handle both JSON data and file uploads
 
-@router.post("/notices", 
+@router.post("/admin/notices", 
     summary="[ADMIN] Create notice with optional file upload",
     dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
@@ -43,7 +43,7 @@ async def create_notice(
     )
 
 
-@router.put("/notices/{notice_id}",
+@router.put("/admin/notices/{notice_id}",
     summary="[ADMIN] Update notice with optional file upload",
     dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
@@ -75,7 +75,7 @@ async def update_notice(
 
 # === NOTICE MANAGEMENT OPERATIONS ===
 
-@router.delete("/notices/{notice_id}", 
+@router.delete("/admin/notices/{notice_id}", 
     summary="[ADMIN] Delete a notice",
     dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
@@ -84,7 +84,7 @@ async def delete_notice_route(notice_id: str):
     return await delete_notice(notice_id)
 
 
-@router.get("/notices", 
+@router.get("/admin/notices", 
     summary="[ADMIN] Get all notices with filtering and pagination",
     dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
@@ -109,7 +109,7 @@ async def get_all_notices_route(
     )
 
 
-@router.get("/notices/{notice_id}", 
+@router.get("/admin/notices/{notice_id}", 
     summary="[ADMIN] Get a notice by ID",
     dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
 )
@@ -126,9 +126,50 @@ async def get_notice_by_id_route(notice_id: str):
     return await get_notice_by_id(notice_id)
 
 
+@router.patch("/admin/notices/{notice_id}/toggle-active", 
+    summary="[ADMIN] Toggle notice active status",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
+)
+async def toggle_notice_active_status(notice_id: str):
+    """
+    Toggle the active status of a notice (true to false or false to true).
+    
+    **ADMIN ONLY** - Requires authentication and admin role.
+    
+    - **notice_id**: UUID of the notice to toggle
+    
+    This will automatically switch:
+    - Active notice (is_active=true) → Inactive (is_active=false)
+    - Inactive notice (is_active=false) → Active (is_active=true)
+    
+    Returns the updated notice with new status.
+    """
+    from controller.noticeController import toggle_notice_active
+    return await toggle_notice_active(notice_id)
+
+
+@router.put("/admin/notices/{notice_id}/set-active", 
+    summary="[ADMIN] Set notice active status",
+    dependencies=[Depends(check_for_authentication_cookie), Depends(require_admin)]
+)
+async def set_notice_active_status(notice_id: str, is_active: bool = Form(...)):
+    """
+    Set the active status of a notice to a specific value.
+    
+    **ADMIN ONLY** - Requires authentication and admin role.
+    
+    - **notice_id**: UUID of the notice to update
+    - **is_active**: Set to true to make notice active, false to make inactive
+    
+    Returns the updated notice with new status.
+    """
+    from controller.noticeController import set_notice_active
+    return await set_notice_active(notice_id, is_active)
+
+
 # === PUBLIC NOTICE ROUTES ===
 
-@router.get("/notices/active", 
+@router.get("/public/notices/active", 
     summary="[PUBLIC] Get active notices only"
 )
 async def get_active_notices_route(

@@ -32,7 +32,7 @@ TORTOISE_ORM = {
     },
     "apps": {
         "models": {
-            "models": ["model.userModel", "model.propertyModel", "model.propertyMediaModel", "model.teamModel", "model.contactModel", "model.screeningQuestionModel", "model.scheduleMeetingModel", "model.noticeModel", "model.propertyRecommendationModel", "model.chatbotModel"],
+            "models": ["model.userModel", "model.propertyModel", "model.propertyMediaModel", "model.teamModel", "model.contactModel", "model.screeningQuestionModel", "model.scheduleMeetingModel", "model.noticeModel", "model.propertyRecommendationModel", "model.chatbotModel", "model.applicationModel"],
             "default_connection": "default",
         }
     }
