@@ -22,6 +22,8 @@ class Property(models.Model):
 
     amenities = fields.JSONField(null=True)   
     pet_policy = fields.TextField(null=True)
+
+    
     appliances_included = fields.JSONField(null=True)  
 
     property_management_contact = fields.TextField(null=True)
