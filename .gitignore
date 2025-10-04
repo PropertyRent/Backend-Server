@@ -15,4 +15,5 @@ ENV/
 env/
 .venv/
 ENCRYPTION_IMPLEMENTATION.md
-
+BOARD_SUPPORT_README.md
+board-support-config.env

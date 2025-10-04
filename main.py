@@ -17,6 +17,7 @@ from routes.propertyRecommendationRoute import router as recommendation_router
 from routes.chatbotRoute import router as chatbot_router
 from routes.applicationRoute import router as application_router
 from routes.tidycalProxyRoute import router as tidycal_proxy_router
+from routes.boardSupportRoute import router as board_support_router
 
 from dbConnection.dbConfig import init_db  
 
@@ -144,6 +145,9 @@ app.include_router(application_router, prefix="/api", tags=["Rental Applications
 
 # TidyCal proxy route - simple pass-through to TidyCal API
 app.include_router(tidycal_proxy_router, prefix="/api", tags=["TidyCal Proxy"])
+
+# Board.Support chat integration routes
+app.include_router(board_support_router, tags=["Board.Support Chat"])
 
 init_db(app)
 
