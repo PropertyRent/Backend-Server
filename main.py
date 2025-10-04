@@ -133,17 +133,13 @@ app.include_router(
     notice_router,
     prefix="/api",
     tags=["Notices"],
-    # No dependencies here - route-level auth will be handled individually
+
 )
 
-# Property recommendation routes - mixed access (public recommendations, admin management)
 app.include_router(recommendation_router, prefix="/api", tags=["Property Recommendations"])  # Mixed access levels
 
-# Chatbot routes - public chat interface and admin management
-app.include_router(chatbot_router, prefix="/api", tags=["Chatbot"])  # Mixed access levels
-
-# Rental application routes - public application submission, admin management
-app.include_router(application_router, prefix="/api", tags=["Rental Applications"])  # Mixed access levels
+app.include_router(chatbot_router, prefix="/api", tags=["Chatbot"])  # 
+app.include_router(application_router, prefix="/api", tags=["Rental Applications"])  
 
 
 
