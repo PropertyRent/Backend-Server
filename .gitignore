@@ -1,0 +1,18 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.env
+.env.*
+venv/
+ENV/
+env/
+.venv/
+DEPLOYMENT_GUIDE.md
+DOCKER_DEPLOYMENT.md
